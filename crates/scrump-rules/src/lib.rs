@@ -47,6 +47,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "boxoauth__subjectidpat", // keyword `user|subject|id` + 6-20 digits — every numeric ID matches
     "browserstack__keypat",  // keyword `key` + 20 alnums — fires on every env var
     "browserstack__userpat", // keyword `user|username` + 9-29 alnums — fires on every env var
+    "circleci_v1__keypat",   // keyword `circle` + 40 hex — matches every git SHA-1 near the word
     "clickhelp__emailpat",   // RFC-shaped email pattern, no provider context
     "clickhelp__keypat",     // keyword `key|token|api|secret` + 24 alnums — every config value
     "cloudflareglobalapikey__emailpat", // RFC-shaped email pattern, no provider context
@@ -63,6 +64,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "dotdigital__passpat",   // keyword `pw|pass` fires on every config password line
     "easyinsight__idpat",    // keyword `id` + 20 alnums — every random env value
     "easyinsight__keypat",   // keyword `key` + 20 alnums — every random env value
+    "eightxeight__idpat",    // keyword `8x8` + 18-30 alnums — matches `8x8 grid`/`8x8 pixel` text
     "elevenlabs_v1__keypat", // keyword `el` matches `elephant`, `panel`, `level`, etc.
     "clicksendsms__keypat",  // `\b([0-9A-Z]{8}-...-{12})\b` UUID, no keyword
     "flowflu__accountpat",   // keyword `account` is too generic

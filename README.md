@@ -120,7 +120,7 @@ auto-extracted `PrefixRegex` (e.g. a `sugester` test input fires the
 nothing TruffleHog catches is missed by scrump. CI gates on
 `SCRUMP_TH_MAX_FAILURES=184`; lowering this number must accompany rule
 fixes, and any increase fails the build. After the #9 rule curation,
-80 structurally-broken patterns are dropped at load time (see
+82 structurally-broken patterns are dropped at load time (see
 `TH_QUARANTINE` in `scrump-rules`) — this is what drove the harness
 from 201 failures down to 184 and the per-MB hit rate on real SQLite
 log artifacts from ~85,000 to under 0.5.

@@ -16,7 +16,7 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   on generic tokens like `id`/`name`/`org`/`key`/`password`, used
   unbounded `{N,}` quantifiers that greedy-matched entire alphanumeric
   regions, or matched email / version-string / hostname / fixed-length
-  hex shapes that occur throughout any real text. 80 structurally-broken
+  hex shapes that occur throughout any real text. 82 structurally-broken
   rule patterns were moved to a `TH_QUARANTINE` list in `scrump-rules`
   and are no longer loaded into the default detector set. The list was
   derived empirically in three passes:
@@ -31,10 +31,13 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
        another wave of rules whose captures looked like Go function
        names, git SHA-1 commit hashes, GraphQL identifiers, and
        all-zero UUIDs.
-  Post-fix on the same SQLite log: **304 hits, down from 61,059,863
-  (~200,000× reduction)**, with an estimated FP rate under 5% based on
-  sample-byte inspection. Users who depend on any quarantined rule for
-  narrow inputs can reintroduce it via `--rules-path FILE.yaml`. (#9)
+  Post-fix on the same SQLite log: **~300 hits, down from 61,059,863
+  (~200,000× reduction)**, with an estimated FP rate of ~1.6% based on
+  sample-byte inspection (most remaining hits are valid RS256 JWTs,
+  Azure CosmosDB keys, NGC keys, HuggingFace tokens, PayPal IDs, the
+  literal `AKIAIOSFODNN7EXAMPLE` test key, and other real-shaped
+  provider tokens). Users who depend on any quarantined rule for narrow
+  inputs can reintroduce it via `--rules-path FILE.yaml`. (#9)
 - The TruffleHog parity harness now honors the same quarantine list when
   reading `provider_map.json`, so a provider whose only rules are
   quarantined is skipped instead of having its positive cases fail
