@@ -104,12 +104,17 @@ jobs:
 
       - name: run compat harness
         env:
-          # 201 known cross-provider false-positives (a negative-case input
+          # 184 known cross-provider false-positives (a negative-case input
           # for provider A trips provider B's auto-extracted PrefixRegex).
           # These are not missed detections — the redaction path is sound.
           # See main.rs for rationale; lowering this should accompany rule
           # fixes, never raising it.
-          SCRUMP_TH_MAX_FAILURES: "201"
+          #
+          # Baseline after #9 rule curation: 201 → 184 (seventeen
+          # cross-provider FPs went away once the 80 structurally-broken
+          # rules listed in `scrump_rules::TH_QUARANTINE` stopped firing
+          # on other providers' negative cases).
+          SCRUMP_TH_MAX_FAILURES: "184"
         run: cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
 
       - name: integration-test inventory
