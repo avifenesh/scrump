@@ -147,6 +147,22 @@ jfr                 617       54        0    92.0%
 pcap                617       54        0    92.0%
 ```
 
+## Local dev loop
+
+If you have [`just`](https://github.com/casey/just) installed:
+
+```sh
+just check                  # fmt + clippy + tests + docs
+just e2e                    # all 8 phase-gate scripts
+just compat-trufflehog      # 864-provider parity (clones vendor/trufflehog on first run)
+just compat-presidio        # 52 recognizers × 8 formats
+just deny                   # cargo-deny supply-chain audit
+just ci                     # everything CI runs, in order
+```
+
+Without `just`, see the recipes in the [`Justfile`](Justfile) for the
+underlying `cargo` invocations.
+
 ## Phase gates
 
 End-to-end gates live under `tests/`:
