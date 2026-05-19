@@ -15,7 +15,7 @@ serde.workspace = true
 serde_yaml.workspace = true
 tracing.workspace = true
 base64.workspace = true
-scrump-core = { path = "../scrump-core", version = "0.1.1" }
+scrump-core = { path = "../scrump-core", version = "0.1.2" }
 
 [lints]
 workspace = true
