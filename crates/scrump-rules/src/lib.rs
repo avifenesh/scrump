@@ -12,6 +12,100 @@ use serde::Deserialize;
 const DEFAULT_RULES_YAML: &str = include_str!("../rules/default.yaml");
 const TRUFFLEHOG_RULES_YAML: &str = include_str!("../rules/trufflehog.yaml");
 
+/// Auto-extracted TruffleHog rules whose patterns produce unusable noise on
+/// real artifacts (issue #9). Each entry was added based on an empirical
+/// audit (`tests/noise_audit.rs`) that runs the full ruleset against an
+/// ~ 8 MB synthetic corpus mimicking SQLite log text, source code, config
+/// files, `.env`-style assignments, alphanumeric blobs, and tar padding.
+/// A rule is quarantined when it either fires more than ten times or
+/// captures more than 1 KB on that corpus — both dimensions matter
+/// because the unbounded-quantifier class (`{N,}` patterns) fires once
+/// per blob but eats megabytes per fire, equally destructive for `scrub`.
+///
+/// These patterns are unsalvageable as scrubber rules: scrump
+/// deliberately does not verify candidates against the upstream
+/// provider's API (the way TruffleHog does), so per-rule false positives
+/// translate one-for-one into destructive overwrites in `scrub`.
+///
+/// Users who need a quarantined rule can reintroduce it via `--rules-path`.
+///
+/// Kept in sorted order so the const itself is easy to review.
+pub const TH_QUARANTINE: &[&str] = &[
+    "alibaba__keypat",                 // `\b([a-zA-Z0-9]{30})\b` no anchor
+    "anypoint__keypat",                // UUID, no keyword anchor
+    "anypoint__orgpat",                // keyword `org` is too generic
+    "atlassian_v2__organizationidpat", // keyword `org|id` + UUID
+    "auth0managementapitoken__managementapitokenpat", // `\b(ey[a-zA-Z0-9._-]+)\b` unbounded
+    "auth0oauth__clientsecretpat",     // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
+    "aws_session_keys__sessionpat",    // `[a-zA-Z0-9+/]{100,}` unbounded — eats megabytes
+    "azure_batch__secretpat",          // raw `[A-Za-z0-9+/=]{88}` no anchor
+    "azureapimanagement_repositorykey__regex", // `\d+\.\d+\.\d+` — fires on every semver in any log
+    "azureapimanagementsubscriptionkey__keypat", // keyword `key` + 32 alnums — fires on every config
+    "boxoauth__subjectidpat", // keyword `user|subject|id` + 6-20 digits — every numeric ID matches
+    "browserstack__keypat",   // keyword `key` + 20 alnums — fires on every env var
+    "browserstack__userpat",  // keyword `user|username` + 9-29 alnums — fires on every env var
+    "clickhelp__emailpat",    // RFC-shaped email pattern, no provider context
+    "clickhelp__keypat",      // keyword `key|token|api|secret` + 24 alnums — every config value
+    "cloudflareglobalapikey__emailpat", // RFC-shaped email pattern, no provider context
+    "copper__idpat",          // `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b` email
+    "currencycloud__emailpat", // RFC-shaped email pattern, no provider context
+    "datadogtoken__apppat",   // keyword `dd` fires on `dd-mm-yyyy` etc.
+    "digitaloceantoken__keypat", // keyword `do` matches every English `do`
+    "dockerhub_v2__emailpat", // RFC-shaped email pattern, no provider context
+    "dockerhub_v2__usernamepat", // keyword `id` matches every config field
+    "docusign__idpat",        // keyword `integration|id` + UUID
+    "dotdigital__passpat",    // keyword `pw|pass` fires on every config password line
+    "easyinsight__idpat",     // keyword `id` + 20 alnums — every random env value
+    "easyinsight__keypat",    // keyword `key` + 20 alnums — every random env value
+    "flowflu__accountpat",    // keyword `account` is too generic
+    "gemini__secretpat",      // unanchored 27-28 char alnum
+    "gitlaboauth2__clientidpat", // keyword `id` + 64 hex
+    "jdbc__pattern",          // `(?i)pass.*?=(.+?)\b` matches any config `password=...` line
+    "jiratoken_v2__domainpat", // `\b((?:[a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]{2,16})\b` matches every dotted hostname
+    "jiratoken_v2__emailpat",  // RFC-shaped email pattern, no provider context
+    "ldap__passwordpat",       // keyword `pass` + quoted 4-48 chars — every config `password='…'`
+    "ldap__usernamepat",       // keyword `user` + any quoted string
+    "magicbell__emailpat",     // RFC-shaped email pattern, no provider context
+    "mapbox__idpat",           // `([a-zA-Z-0-9]{4,32})` no boundary, no keyword
+    "mrticktock__emailpat",    // RFC-shaped email pattern, no provider context
+    "netsuite__accountidpat",  // keyword `id|account|netsuite` too broad
+    "onedesk__emailpat",       // RFC-shaped email pattern, no provider context
+    "onelogin__oauthclientidpat", // keyword `id` + 64 lowercase hex
+    "openvpn__clientsecretpat", // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
+    "paypaloauth__keypat", // `\b([A-Za-z0-9_\.\-]{44,80})\b` no anchor; needs hand-coded rule in default.yaml
+    "planetscale__usernamepat", // `\b[a-z0-9]{12}\b` no keyword
+    "planetscaledb__usernamepat", // `\b[a-z0-9]{20}\b` no keyword
+    "postgres__connstrpartpattern", // `([[:alpha:]]+)='(.+?)' ?` matches every quoted assignment; default.yaml has the proper postgres__uripattern
+    "pusherchannelkey__keypat",     // keyword `key` ALONE — fires on every key/value pair
+    "razorpay__secretpat", // `\b[A-Za-z0-9]{24}\b` no anchor — the auto-extracted pattern is broken even though the curated version works
+    "robinhoodcrypto__privkeybase64pat", // generic base64 with `=`/`==` tail
+    "salesforceoauth2__consumersecretpat", // keyword `secret|consumer` + 19-64 alnums
+    "salesforcerefreshtoken__consumersecretpat", // same shape as above
+    "saucelabs__usernamepat", // keyword `username` + 2-70 alnums — too loose
+    "sourcegraph__keypat", // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
+    "sparkpost__keypat",   // `\b([a-zA-Z0-9]{40})\b` no anchor
+    "tableau__tokennamepat", // keyword `name` is too generic
+    "trelloapikey__tokenpat", // `\b([a-zA-Z-0-9]{64})\b` no anchor
+    "tru__keypat",         // keyword `tru` + UUID — same broken keyword as tru__secrepat
+    "tru__secrepat",       // keyword `tru` matches `true`, `trust`, etc.
+    "twilio__keypat",      // `\b[0-9a-f]{32}\b` — matches every MD5 / 32-char hex
+    "twilioapikey__secretpat", // `\b[0-9a-zA-Z]{32}\b` no anchor
+    "wepay__appidpat",     // `\b(\d{6})\b` — every six-digit number
+    "zendeskapi__email",   // email pattern, no provider context
+    "zipapi__emailpat",    // RFC-shaped email pattern, no provider context
+    "zipbooks__emailpat",  // RFC-shaped email pattern, no provider context
+    "zipbooks__pwordpat",  // keyword `zipbooks|password` fires on every config
+    "zulipchat__idpat",    // email pattern, no provider context
+];
+
+/// Returns `true` when a rule id is part of the active ruleset — i.e. it
+/// is not on the quarantine list. Exposed so the TruffleHog compat harness
+/// can honor the same curation when consulting the auto-generated
+/// `provider_map.json`.
+pub fn rule_is_active(id: &str) -> bool {
+    !TH_QUARANTINE.contains(&id)
+}
+
 #[derive(Debug, Deserialize)]
 struct RulesFile {
     rules: Vec<RuleDef>,
@@ -65,11 +159,11 @@ impl Detector for YamlDetector {
 }
 
 /// Load detectors from the embedded default ruleset (curated rules +
-/// auto-extracted TruffleHog mirror + hand-coded detectors that need
-/// post-pattern logic regex can't express).
+/// auto-extracted TruffleHog mirror minus the quarantined-for-noise rules
+/// + hand-coded detectors that need post-pattern logic regex can't express).
 pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
     let mut all = parse_yaml(DEFAULT_RULES_YAML)?;
-    let th = parse_yaml(TRUFFLEHOG_RULES_YAML)?;
+    let th = parse_yaml_filtered(TRUFFLEHOG_RULES_YAML, rule_is_active)?;
     all.extend(th);
 
     // Replace every JWT pattern with our HMAC-aware detector. Both the
@@ -166,10 +260,17 @@ pub fn detectors_from_path(p: &Path) -> Result<Vec<Box<dyn Detector>>> {
 }
 
 fn parse_yaml(s: &str) -> Result<Vec<Box<dyn Detector>>> {
+    parse_yaml_filtered(s, |_| true)
+}
+
+/// Parse a YAML ruleset, retaining only rules whose id satisfies `keep`.
+/// Used to drop quarantined rules from the auto-extracted TruffleHog set.
+fn parse_yaml_filtered(s: &str, keep: impl Fn(&str) -> bool) -> Result<Vec<Box<dyn Detector>>> {
     let file: RulesFile =
         serde_yaml::from_str(s).map_err(|e| ScrumpError::Other(format!("yaml parse: {e}")))?;
     file.rules
         .into_iter()
+        .filter(|d| keep(&d.id))
         .map(|d| YamlDetector::from_def(d).map(|x| Box::new(x) as Box<dyn Detector>))
         .collect()
 }

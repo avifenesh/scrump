@@ -6,6 +6,43 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Suppressed runaway false positives from auto-extracted TruffleHog rules
+  on real-world artifacts. `scrump scan` and `scrump scrub` previously
+  produced unusable noise on common shapes (~60M hits on a 671 MB
+  SQLite log, ~159k hits on a 486 KB public OSS tarball) because a long
+  tail of auto-extracted rules either had no keyword anchor, anchored
+  on generic tokens like `id`/`name`/`org`/`key`/`password`, used
+  unbounded `{N,}` quantifiers that greedy-matched entire alphanumeric
+  regions, or matched email / version-string / hostname / fixed-length
+  hex shapes that occur throughout any real text. 65 structurally-broken
+  rule patterns were moved to a `TH_QUARANTINE` list in `scrump-rules`
+  and are no longer loaded into the default detector set. The list was
+  derived empirically — first by an in-tree audit
+  (`crates/scrump-rules/tests/noise_audit.rs`) that runs every active
+  rule against an ≈ 8 MB synthetic corpus, then by rescanning a real
+  671 MB SQLite log artifact end-to-end and quarantining any rule with
+  more than 100 hits. On that artifact the post-fix scan reports 601
+  hits — down from 61,059,863 — a 101,597× reduction. Users who depend
+  on any quarantined rule for narrow inputs can reintroduce it via
+  `--rules-path FILE.yaml`. (#9)
+- The TruffleHog parity harness now honors the same quarantine list when
+  reading `provider_map.json`, so a provider whose only rules are
+  quarantined is skipped instead of having its positive cases fail
+  against an empty engine. Net effect on the harness: 201 → 187 known
+  cross-provider FPs.
+
+### Added
+
+- `scrump-rules` integration test `fp_regression` asserts the active
+  ruleset stays bounded on a synthetic noise corpus (log lines, source
+  code, config files, alphanumeric blob, tar padding ≈ 8 MB): no rule
+  may fire more than 10 times or capture more than 1024 bytes, and
+  `scrub` on the corpus must overwrite ≤ 0.1% of the bytes. A separate
+  `noise_audit` test (`#[ignore]`d by default) prints the full
+  per-rule distribution for diagnosing future regressions.
+
 ## [0.1.2] — 2026-05-19
 
 ### Added

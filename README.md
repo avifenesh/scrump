@@ -112,14 +112,18 @@ live under `crates/scrump-{trufflehog,presidio}-compat/`.
 every `*_test.go` under TruffleHog's `pkg/detectors/`, parses each
 parametrized test, and runs scrump against the test input.
 
-**Last full run: 2,335 of 2,536 cases pass across 864 providers
-(92.1%).** The remaining 201 are negative-case false-positives where
+**Last full run: 2,325 of 2,512 cases pass across 855 providers
+(92.6%).** The remaining 187 are negative-case false-positives where
 provider A's no-hit-expected input still trips provider B's
 auto-extracted `PrefixRegex` (e.g. a `sugester` test input fires the
 `tableau` rule). They are over-detection in a scrubbing context —
 nothing TruffleHog catches is missed by scrump. CI gates on
-`SCRUMP_TH_MAX_FAILURES=201`; lowering this number must accompany rule
-fixes, and any increase fails the build.
+`SCRUMP_TH_MAX_FAILURES=187`; lowering this number must accompany rule
+fixes, and any increase fails the build. After the #9 rule curation,
+65 structurally-broken patterns are dropped at load time (see
+`TH_QUARANTINE` in `scrump-rules`) — this is what drove the harness
+from 201 failures down to 187 and the per-MB hit rate on real SQLite
+log artifacts from ~85,000 to under 1.
 
 ### Microsoft Presidio (PII) cross-format
 
