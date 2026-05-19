@@ -3,7 +3,7 @@
 //! Strategy:
 //!   * load the file into memory;
 //!   * verify the `PERFILE2` magic and parse the 104-byte
-//!     [`perf_file_header`] manually (so we don't depend on a third-party
+//!     `perf_file_header` manually (so we don't depend on a third-party
 //!     parser version-matrix for the dispatcher);
 //!   * after the data section, walk the packed feature-section
 //!     descriptors in `adds_features` bit order and surface each

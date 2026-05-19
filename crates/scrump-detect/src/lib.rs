@@ -2,8 +2,8 @@
 //! returns [`Hit`]s.
 //!
 //! Designed to be cheap to construct, expensive only when scanning. For
-//! large files, callers should hand chunks to [`Engine::scan_chunks`] which
-//! parallelises across `rayon`'s default pool.
+//! large files, callers should hand chunks to [`Engine::scan_chunks_par`]
+//! which parallelises across `rayon`'s default pool.
 
 use rayon::prelude::*;
 use scrump_core::{shannon_entropy, Chunk, Detector, Hit};

@@ -170,8 +170,8 @@ impl std::fmt::Debug for Handler {
 ///
 /// Handlers are tried in registration order; the first one whose `detect`
 /// returns true wins. If none match and a [`fallback`](Dispatcher::set_fallback)
-/// is set, the fallback handles the file. Otherwise [`open_path`] /
-/// [`open_bytes`] return [`ScrumpError::UnsupportedFormat`].
+/// is set, the fallback handles the file. Otherwise [`Dispatcher::open_path`] /
+/// [`Dispatcher::open_bytes`] return [`ScrumpError::UnsupportedFormat`].
 #[derive(Default)]
 pub struct Dispatcher {
     handlers: Vec<Handler>,
