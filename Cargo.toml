@@ -42,7 +42,7 @@ tar = "0.4"
 flate2 = "1"
 zstd = "0.13"
 zip = { version = "2", default-features = false, features = ["deflate"] }
-linux-perf-data = "0.10"
+linux-perf-data = "0.13"
 object = { version = "0.36", default-features = false, features = ["std", "read_core", "elf"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 base64 = "0.22"
