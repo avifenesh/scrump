@@ -907,11 +907,22 @@ fn main() -> std::io::Result<()> {
                     skipped_no_rules += 1;
                     continue;
                 };
-                if rule_strings.is_empty() {
+                // Drop rules that scrump-rules quarantined as unusable
+                // noise on real artifacts (issue #9). A provider whose
+                // only auto-extracted rules are quarantined is skipped:
+                // its positive cases would always fail because the
+                // engine no longer carries that rule, so counting them
+                // as failures would just inflate the harness floor.
+                let active: Vec<&str> = rule_strings
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|id| scrump_rules::rule_is_active(id))
+                    .collect();
+                if active.is_empty() {
                     skipped_no_rules += 1;
                     continue;
                 }
-                rule_strings.iter().map(String::as_str).collect()
+                active
             }
         };
         let spec = ProviderSpec {

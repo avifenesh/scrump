@@ -790,6 +790,7 @@ dependencies = [
  "base64",
  "regex",
  "scrump-core",
+ "scrump-detect",
  "serde",
  "serde_yaml",
  "tracing",

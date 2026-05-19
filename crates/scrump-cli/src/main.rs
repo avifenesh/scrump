@@ -25,7 +25,15 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Cmd {
     /// Scan a file and report findings without mutating it.
-    Scan { path: PathBuf },
+    Scan {
+        path: PathBuf,
+        /// Print up to N example matched-byte slices per rule (printable
+        /// bytes verbatim, non-printable hex-escaped, truncated to 120
+        /// chars). Useful for characterizing whether remaining hits are
+        /// real tokens or false positives — see issue #9.
+        #[arg(long, value_name = "N")]
+        samples: Option<usize>,
+    },
     /// Redact a file in place (or to -o).
     Scrub {
         path: PathBuf,
@@ -73,7 +81,9 @@ fn main() -> Result<()> {
     let dispatcher = build_dispatcher();
 
     match cli.cmd {
-        Cmd::Scan { path } => scan(&path, &dispatcher, cli.format.as_deref(), &engine),
+        Cmd::Scan { path, samples } => {
+            scan(&path, &dispatcher, cli.format.as_deref(), &engine, samples)
+        }
         Cmd::Scrub { path, out, backup } => scrub(
             &path,
             out.as_deref(),
@@ -96,10 +106,19 @@ fn open(d: &Dispatcher, path: &Path, force: Option<&str>) -> Result<Box<dyn Form
     }
 }
 
-fn scan(path: &Path, d: &Dispatcher, force: Option<&str>, eng: &Engine) -> Result<()> {
+fn scan(
+    path: &Path,
+    d: &Dispatcher,
+    force: Option<&str>,
+    eng: &Engine,
+    samples: Option<usize>,
+) -> Result<()> {
     let fmt = open(d, path, force)?;
     println!("(format={})", fmt.name());
     let mut hit_count = 0usize;
+    let cap = samples.unwrap_or(0);
+    let mut per_rule_samples: std::collections::BTreeMap<String, (usize, Vec<Vec<u8>>)> =
+        std::collections::BTreeMap::new();
     for chunk in fmt.chunks() {
         for h in eng.scan_chunk(&chunk) {
             hit_count += 1;
@@ -111,6 +130,19 @@ fn scan(path: &Path, d: &Dispatcher, force: Option<&str>, eng: &Engine) -> Resul
                 h.rule_id,
                 h.origin
             );
+            if cap > 0 {
+                let entry = per_rule_samples
+                    .entry(h.rule_id.clone())
+                    .or_insert((0, Vec::new()));
+                entry.0 += 1;
+                if entry.1.len() < cap {
+                    let start = h.offset.saturating_sub(chunk.offset) as usize;
+                    let end = (start + h.len).min(chunk.bytes.len());
+                    if start < chunk.bytes.len() {
+                        entry.1.push(chunk.bytes[start..end].to_vec());
+                    }
+                }
+            }
         }
     }
     if hit_count == 0 {
@@ -118,7 +150,37 @@ fn scan(path: &Path, d: &Dispatcher, force: Option<&str>, eng: &Engine) -> Resul
     } else {
         println!("found: {hit_count} hit(s) in {}", path.display());
     }
+    if cap > 0 && !per_rule_samples.is_empty() {
+        println!("\n---- per-rule samples (up to {cap}) ----");
+        let mut by_count: Vec<_> = per_rule_samples.iter().collect();
+        by_count.sort_by_key(|(_, (count, _))| std::cmp::Reverse(*count));
+        for (rule, (count, examples)) in by_count {
+            println!("\n[{rule}]  hits={count}");
+            for ex in examples {
+                println!("    {}", render_sample(ex));
+            }
+        }
+    }
     Ok(())
+}
+
+/// Render a matched-byte slice for human inspection: printable bytes
+/// verbatim, anything else hex-escaped. Truncated to 120 chars so the
+/// terminal stays readable on large captures.
+fn render_sample(bytes: &[u8]) -> String {
+    const MAX: usize = 120;
+    let mut out = String::with_capacity(bytes.len());
+    for &b in bytes.iter().take(MAX) {
+        if (0x20..0x7f).contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("\\x{b:02x}"));
+        }
+    }
+    if bytes.len() > MAX {
+        out.push_str(&format!("…[+{} bytes]", bytes.len() - MAX));
+    }
+    out
 }
 
 fn scrub(
