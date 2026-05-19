@@ -60,7 +60,7 @@ jobs:
           ( cd dist && tar -czf "${name}.tar.gz" "${name}" && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
 
       - name: upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scrump-${{ matrix.target }}
           path: dist/scrump-*.tar.gz*
