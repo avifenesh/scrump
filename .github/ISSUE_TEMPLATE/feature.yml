@@ -1,0 +1,27 @@
+name: Feature request
+description: A new flag, behavior change, or rule.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the underlying problem?
+      description: Describe the situation, not the proposed solution. We'll discuss the solution together.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround (if any)
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: One concrete shape this could take
+      description: Optional. Sketch a CLI flag, a YAML field, or an API change. Open to alternatives.
+    validations:
+      required: false

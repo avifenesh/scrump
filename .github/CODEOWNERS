@@ -1,0 +1,8 @@
+# Default owner for everything in this repo.
+*       @avifenesh
+
+# Security-critical surfaces require explicit review.
+/SECURITY.md            @avifenesh
+/crates/scrump-core/    @avifenesh
+/crates/scrump-detect/  @avifenesh
+/crates/scrump-rules/   @avifenesh

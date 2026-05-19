@@ -17,6 +17,8 @@ opens in Nsight Systems; the redacted SQLite still passes `sqlite3
 
 [![CI](https://github.com/avifenesh/scrump/actions/workflows/ci.yml/badge.svg)](https://github.com/avifenesh/scrump/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Rust: 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![GitHub release](https://img.shields.io/github/v/release/avifenesh/scrump?include_prereleases&sort=semver)](https://github.com/avifenesh/scrump/releases)
 
 ## Formats
 
@@ -38,9 +40,18 @@ opens in Nsight Systems; the redacted SQLite still passes `sqlite3
 # From source (Rust 1.75+)
 cargo install --path crates/scrump-cli
 
-# Or grab a pre-built binary from the latest release
-curl -L https://github.com/avifenesh/scrump/releases/latest/download/scrump-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+# Or grab a pre-built binary from the latest release (see the Releases tab
+# for the current version; tarballs are signed and shasum'd):
+gh release download --repo avifenesh/scrump --pattern '*-x86_64-unknown-linux-gnu.tar.gz'
 ```
+
+Supported targets out of the box:
+
+| Target | Tier |
+|---|---|
+| `x86_64-unknown-linux-gnu` | tier-1 (cross-compiled in CI release) |
+| `aarch64-unknown-linux-gnu` | tier-1 (cross-compiled in CI release) |
+| `aarch64-apple-darwin`     | tier-1 (cross-compiled in CI release) |
 
 ## Use
 
@@ -101,11 +112,14 @@ live under `crates/scrump-{trufflehog,presidio}-compat/`.
 every `*_test.go` under TruffleHog's `pkg/detectors/`, parses each
 parametrized test, and runs scrump against the test input.
 
-**Last full run: 2,335 of 2,536 cases pass across 864 providers — zero
-tolerated divergences.** Failures cluster on structural differences
-(TruffleHog's multi-pattern correlation for things like SIN+name+url
-tuples) that scrump doesn't try to mirror; basic pattern matching is
-at parity.
+**Last full run: 2,335 of 2,536 cases pass across 864 providers
+(92.1%).** The remaining 201 are negative-case false-positives where
+provider A's no-hit-expected input still trips provider B's
+auto-extracted `PrefixRegex` (e.g. a `sugester` test input fires the
+`tableau` rule). They are over-detection in a scrubbing context —
+nothing TruffleHog catches is missed by scrump. CI gates on
+`SCRUMP_TH_MAX_FAILURES=201`; lowering this number must accompany rule
+fixes, and any increase fails the build.
 
 ### Microsoft Presidio (PII) cross-format
 
@@ -151,6 +165,40 @@ Each gate plants known token shapes, runs `scrump scrub`, then asserts
 the file size is preserved, the format's magic / structural fields are
 untouched, the format's native tooling still parses it, and no token
 prefix remains in the raw bytes.
+
+## Project layout
+
+```
+scrump/
+├── crates/
+│   ├── scrump-core/                # Format trait, Hit, Dispatcher
+│   ├── scrump-detect/              # regex + entropy engine
+│   ├── scrump-rules/               # curated + auto-extracted rule sets
+│   ├── scrump-cli/                 # the `scrump` binary
+│   ├── scrump-format-passthrough/  # text-and-anything fallback
+│   ├── scrump-format-perf/         # PERFILE2
+│   ├── scrump-format-tar/          # tar / zip / gz / zst (recursive)
+│   ├── scrump-format-sqlite/       # SQLite3
+│   ├── scrump-format-nsys/         # NVIDIA nsys-rep / ncu-rep
+│   ├── scrump-format-core/         # ELF core dumps
+│   ├── scrump-format-hprof/        # Java HPROF
+│   ├── scrump-format-jfr/          # Java Flight Recorder
+│   ├── scrump-format-pcap/         # pcap / pcapng
+│   ├── scrump-test-fixtures/       # spec-compliant generators
+│   ├── scrump-trufflehog-compat/   # 864-provider parity harness
+│   └── scrump-presidio-compat/     # 8-format × 52-recognizer harness
+├── tests/                          # phase 0..7 e2e gates
+└── docs/                           # architecture, threat model
+```
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the internal design,
+and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the format/detector
+add-a-new-X checklists.
+
+## Security
+
+scrump is a security tool — please report vulnerabilities privately via
+the process in [`SECURITY.md`](SECURITY.md).
 
 ## License
 

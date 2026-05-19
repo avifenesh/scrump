@@ -1,0 +1,94 @@
+name: Bug report
+description: Something scrump did wrong (or refused to do) on a real file.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: if this involves a real captured credential, rotate it
+        first. Don't paste live tokens; redacted/obfuscated examples are fine.
+
+        If this looks like a security issue (leak past redaction, path
+        traversal, RCE via rules YAML), report it privately per SECURITY.md
+        instead of here.
+
+  - type: input
+    id: version
+    attributes:
+      label: scrump version
+      description: Output of `scrump --version` (or the commit SHA if built from source).
+      placeholder: "0.1.0 (1890b7a)"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / arch
+      placeholder: "Ubuntu 24.04, x86_64"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: Format
+      options:
+        - passthrough
+        - perf
+        - tar / zip
+        - sqlite
+        - nsys / ncu
+        - elf-core
+        - hprof
+        - jfr
+        - pcap
+        - other / unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command run
+      description: Include any custom rules path.
+      render: shell
+      placeholder: scrump scrub capture.perf.data
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Include stderr, exit code, and (if relevant) downstream tool output (`perf report`, `sqlite3`, etc.).
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal repro
+      description: |
+        If you can attach a synthetic file that reproduces (no live tokens),
+        please do — even better is a snippet for `scrump-test-fixtures` that
+        generates it. Without a repro, we can usually still triage but can't
+        guarantee a fix.
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I rotated any real credential involved before filing.
+          required: true
+        - label: I checked `scrump scan` to see whether the rule fired (and on which bytes).
+          required: false

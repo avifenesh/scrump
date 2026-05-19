@@ -1,0 +1,61 @@
+name: New format support
+description: Ask scrump to learn a new capture-file format.
+title: "format: "
+labels: ["enhancement", "format"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For scrump to support a new format we need three things from you:
+        a spec, a real-ish sample, and a sense of where the sensitive data lives.
+
+  - type: input
+    id: name
+    attributes:
+      label: Format name
+      placeholder: "WhateverFormat v3"
+    validations:
+      required: true
+
+  - type: input
+    id: extension
+    attributes:
+      label: Typical file extension(s)
+      placeholder: ".wfmt, .wfmt.gz"
+    validations:
+      required: true
+
+  - type: input
+    id: spec
+    attributes:
+      label: Where is the on-disk spec documented?
+      description: URL to upstream docs, a header file, an RFC, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sensitive
+    attributes:
+      label: Where in the file does sensitive data typically end up?
+      description: e.g. "process cmdline in the header block at offset N" or "a string-pool section keyed by some-key".
+    validations:
+      required: true
+
+  - type: textarea
+    id: structural
+    attributes:
+      label: What bytes are structural / must not be touched?
+      description: Magic words, length prefixes, varints, checksums, indexed offsets.
+    validations:
+      required: true
+
+  - type: textarea
+    id: native-tool
+    attributes:
+      label: How do we verify a scrubbed file is still valid?
+      description: |
+        The phase gate runs the format's native tool over the scrubbed file
+        to confirm it still parses. What's the equivalent for this format?
+        e.g. `perf report --input`, `sqlite3 file ".schema"`, etc.
+    validations:
+      required: true
