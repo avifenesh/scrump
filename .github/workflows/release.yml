@@ -17,15 +17,32 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Linux
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
             cross: false
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest
             cross: true
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            cross: true
+          # macOS
           - target: aarch64-apple-darwin
             runner: macos-latest
             cross: false
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+            cross: false
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            cross: false
+            exe: .exe
+          - target: aarch64-pc-windows-msvc
+            runner: windows-latest
+            cross: false
+            exe: .exe
     steps:
       - uses: actions/checkout@v6
 
@@ -37,11 +54,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: install cross (Linux aarch64 only)
+      - name: install cross (Linux cross-compiled targets only)
         if: matrix.cross
         run: cargo install cross --locked
 
       - name: build
+        shell: bash
         run: |
           if [[ "${{ matrix.cross }}" == "true" ]]; then
             cross build --release --target ${{ matrix.target }} -p scrump-cli
@@ -49,7 +67,9 @@ jobs:
             cargo build --release --target ${{ matrix.target }} -p scrump-cli
           fi
 
-      - name: package
+      - name: package (unix)
+        if: matrix.runner != 'windows-latest'
+        shell: bash
         run: |
           set -euo pipefail
           ver="${GITHUB_REF_NAME}"
@@ -59,11 +79,26 @@ jobs:
           cp README.md LICENSE CONTRIBUTING.md "dist/${name}/"
           ( cd dist && tar -czf "${name}.tar.gz" "${name}" && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
 
+      - name: package (windows)
+        if: matrix.runner == 'windows-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME}"
+          name="scrump-${ver}-${{ matrix.target }}"
+          mkdir -p "dist/${name}"
+          cp "target/${{ matrix.target }}/release/scrump.exe" "dist/${name}/"
+          cp README.md LICENSE CONTRIBUTING.md "dist/${name}/"
+          ( cd dist && 7z a "${name}.zip" "${name}" >/dev/null && \
+            sha256sum "${name}.zip" > "${name}.zip.sha256" )
+
       - name: upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: scrump-${{ matrix.target }}
-          path: dist/scrump-*.tar.gz*
+          path: |
+            dist/scrump-*.tar.gz*
+            dist/scrump-*.zip*
 
   release:
     name: publish GitHub release
@@ -81,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find dist -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -exec cp {} release/ \;
+          find dist -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.sha256' \) -exec cp {} release/ \;
           ls -la release
 
       - name: create release + upload assets
