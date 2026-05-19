@@ -6,6 +6,8 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-05-20
+
 ### Fixed
 
 - Suppressed runaway false positives from auto-extracted TruffleHog rules
@@ -137,7 +139,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/avifenesh/scrump/releases/tag/v0.1.3
 [0.1.2]: https://github.com/avifenesh/scrump/releases/tag/v0.1.2
 [0.1.1]: https://github.com/avifenesh/scrump/releases/tag/v0.1.1
 [0.1.0]: https://github.com/avifenesh/scrump/releases/tag/v0.1.0
