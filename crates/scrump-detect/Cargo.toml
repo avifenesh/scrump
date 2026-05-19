@@ -1,0 +1,15 @@
+[package]
+name = "scrump-detect"
+description = "Detection engine for scrump (regex + entropy)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+regex.workspace = true
+rayon.workspace = true
+tracing.workspace = true
+scrump-core = { path = "../scrump-core", version = "0.1.0" }

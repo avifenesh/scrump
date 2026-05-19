@@ -1,0 +1,31 @@
+[package]
+name = "scrump-cli"
+description = "scrump CLI binary: scan and scrub capture artifacts for leaked secrets."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "scrump"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+scrump-core = { path = "../scrump-core", version = "0.1.0" }
+scrump-detect = { path = "../scrump-detect", version = "0.1.0" }
+scrump-rules = { path = "../scrump-rules", version = "0.1.0" }
+scrump-format-passthrough = { path = "../scrump-format-passthrough", version = "0.1.0" }
+scrump-format-perf = { path = "../scrump-format-perf", version = "0.1.0" }
+scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.0" }
+scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.0" }
+scrump-format-nsys = { path = "../scrump-format-nsys", version = "0.1.0" }
+scrump-format-core = { path = "../scrump-format-core", version = "0.1.0" }
+scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.0" }
+scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.0" }
+scrump-format-pcap = { path = "../scrump-format-pcap", version = "0.1.0" }

@@ -1,0 +1,22 @@
+[package]
+name = "scrump-format-tar"
+description = "tar / tar.gz / tar.zst / zip recursive container handler."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tar.workspace = true
+flate2.workspace = true
+zstd.workspace = true
+zip.workspace = true
+scrump-core = { path = "../scrump-core", version = "0.1.0" }
+scrump-format-passthrough = { path = "../scrump-format-passthrough", version = "0.1.0" }
+scrump-format-perf = { path = "../scrump-format-perf", version = "0.1.0" }
+scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.0" }
+scrump-format-core = { path = "../scrump-format-core", version = "0.1.0" }
+scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.0" }
+scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.0" }

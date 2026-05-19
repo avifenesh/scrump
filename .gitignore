@@ -1,0 +1,14 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+.idea/
+.vscode/
+*.orig
+*.tmp
+
+# Third-party source kept out of the tree — CI re-clones it on demand.
+/vendor/
+
+# Local-only intermediate / generated artifacts.
+/crates/scrump-trufflehog-compat/data/
+/crates/scrump-presidio-compat/data/

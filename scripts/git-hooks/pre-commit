@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# scrump pre-commit hook.
+#
+# Runs `cargo fmt --check` and `cargo clippy -D warnings` on the workspace
+# before allowing a commit. Skipped automatically if no Rust or Cargo
+# manifest files are staged (so docs-only commits are fast).
+#
+# Bypass (only when you're absolutely sure):
+#     git commit --no-verify
+
+set -euo pipefail
+
+# Skip if no Rust source / Cargo manifest is staged.
+if ! git diff --cached --name-only --diff-filter=ACMR \
+        | grep -qE '(^|/)(.*\.rs|Cargo\.toml|Cargo\.lock)$'; then
+    exit 0
+fi
+
+# Locate cargo (hooks can run from a non-interactive shell that lacks PATH bits).
+if ! command -v cargo >/dev/null 2>&1; then
+    for candidate in "$HOME/.cargo/bin/cargo" /usr/local/cargo/bin/cargo; do
+        if [[ -x "$candidate" ]]; then
+            export PATH="$(dirname "$candidate"):$PATH"
+            break
+        fi
+    done
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "pre-commit: cargo not found on PATH" >&2
+    exit 1
+fi
+
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+blue()  { printf '\033[34m%s\033[0m\n' "$*"; }
+
+blue "[pre-commit] cargo fmt --all -- --check"
+if ! cargo fmt --all -- --check; then
+    red "[pre-commit] formatting violations. Run: cargo fmt --all"
+    exit 1
+fi
+
+blue "[pre-commit] cargo clippy --workspace --all-targets -- -D warnings"
+if ! cargo clippy --workspace --all-targets --quiet -- -D warnings; then
+    red "[pre-commit] clippy warnings. Fix them or run: cargo clippy --fix --workspace --all-targets --allow-staged"
+    exit 1
+fi
+
+green "[pre-commit] OK"

@@ -1,0 +1,100 @@
+# Default rules embedded in the scrump binary.
+#
+# Each rule has:
+#   id           - unique short identifier
+#   pattern      - regex::bytes::Regex (no lookaround/backrefs)
+#   min_entropy  - optional Shannon-entropy floor (bits/byte) on the match
+#
+# Patterns are validated against TruffleHog's detector test corpus by
+# `scrump-trufflehog-compat`. When you change a pattern, run:
+#
+#     cargo run -p scrump-trufflehog-compat
+rules:
+  # ---- GitHub --------------------------------------------------------------
+  # TruffleHog's classic+fine-grained merged form: ghp|gho|ghu|ghs|ghr+_ then
+  # 36..255 alphanumerics or underscores. Matches the very long github-server
+  # tokens too.
+  - id: github_pat_classic
+    pattern: 'ghp_[A-Za-z0-9_]{36,255}'
+  - id: github_oauth_token
+    pattern: 'gho_[A-Za-z0-9_]{36,255}'
+  - id: github_user_token
+    pattern: 'ghu_[A-Za-z0-9_]{36,255}'
+  - id: github_server_token
+    pattern: 'ghs_[A-Za-z0-9_]{36,255}'
+  - id: github_refresh_token
+    pattern: 'ghr_[A-Za-z0-9_]{36,255}'
+  - id: github_fine_grained_pat
+    pattern: 'github_pat_[A-Za-z0-9_]{82,255}'
+
+  # ---- HuggingFace --------------------------------------------------------
+  # TruffleHog: \b(?:hf_|api_org_)[a-zA-Z0-9]{34}\b — exactly 34 chars.
+  - id: huggingface_user_token
+    pattern: '(?:hf_|api_org_)[A-Za-z0-9]{34}'
+
+  # ---- OpenAI -------------------------------------------------------------
+  # Includes service-account / project key shapes with `-` / `_` allowed
+  # before the `T3BlbkFJ` middle marker.
+  - id: openai_classic_key
+    pattern: 'sk-(?:[A-Za-z0-9_-]+)?T3BlbkFJ[A-Za-z0-9_-]{20,}'
+  - id: openai_project_key
+    pattern: 'sk-proj-[A-Za-z0-9_-]{20,}'
+
+  # ---- Anthropic ----------------------------------------------------------
+  # TruffleHog: \b(sk-ant-(?:admin01|api03)-[\w\-]{93}AA)\b — strict length.
+  - id: anthropic_api_key
+    pattern: 'sk-ant-(?:admin01|api03)-[A-Za-z0-9_-]{93}AA'
+
+  # ---- AWS ----------------------------------------------------------------
+  # TruffleHog accepts AKIA|ABIA|ACCA; ASIA is the temp-key family.
+  - id: aws_access_key_id
+    pattern: '(?:AKIA|ABIA|ACCA)[0-9A-Z]{16}'
+  - id: aws_temp_access_key_id
+    pattern: 'ASIA[0-9A-Z]{16}'
+
+  # ---- Google -------------------------------------------------------------
+  - id: google_oauth_access_token
+    pattern: 'ya29\.[A-Za-z0-9_-]{20,}'
+  - id: google_api_key
+    pattern: 'AIza[A-Za-z0-9_-]{35}'
+
+  # ---- Slack --------------------------------------------------------------
+  # TruffleHog: separate patterns per token kind; numeric-numeric-mixed shape.
+  # Match xoxX-<10..13 digits>-<10..13 digits><suffix>.
+  - id: slack_bot_token
+    pattern: 'xoxb-[0-9]{10,13}-[0-9]{10,13}[A-Za-z0-9-]*'
+  - id: slack_user_token
+    pattern: 'xoxp-[0-9]{10,13}-[0-9]{10,13}[A-Za-z0-9-]*'
+  - id: slack_app_token
+    pattern: 'xapp-[A-Za-z0-9-]{20,}'
+  - id: slack_workspace_access_token
+    pattern: 'xoxa-[0-9]{10,13}-[0-9]{10,13}[A-Za-z0-9-]*'
+  - id: slack_workspace_refresh_token
+    pattern: 'xoxr-[0-9]{10,13}-[0-9]{10,13}[A-Za-z0-9-]*'
+
+  # ---- ML / inference -----------------------------------------------------
+  # TruffleHog nvapi pattern: \b(nvapi-[a-zA-Z0-9_-]{64})\b
+  - id: nvidia_ngc_api_key
+    pattern: 'nvapi-[A-Za-z0-9_-]{64}'
+  # Two shapes accepted:
+  #   * prefixed `wandb-…` form (scrump's original default);
+  #   * bare 40-hex form near the `wandb` keyword (TruffleHog parity).
+  # `capture_index: 1` redacts only the 40-hex inside the group, leaving
+  # the `wandb` keyword and intervening characters untouched.
+  - id: wandb_api_key_prefixed
+    pattern: 'wandb-[A-Fa-f0-9]{40}'
+  - id: wandb_api_key_keyword
+    pattern: '(?i)wandb[\s\S]{0,300}?([0-9a-f]{40})'
+    capture_index: 1
+
+  # ---- Stripe -------------------------------------------------------------
+  # TruffleHog: secretKey = [rs]k_live_[a-zA-Z0-9]{20,247}
+  - id: stripe_live_secret
+    pattern: '[rs]k_live_[A-Za-z0-9]{20,247}'
+  - id: stripe_test_secret
+    pattern: '[rs]k_test_[A-Za-z0-9]{20,247}'
+
+  # ---- Generic shapes -----------------------------------------------------
+  - id: jwt_token
+    pattern: 'eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}'
+    min_entropy: 3.5

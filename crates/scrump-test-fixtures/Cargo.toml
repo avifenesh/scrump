@@ -1,0 +1,42 @@
+[package]
+name = "scrump-test-fixtures"
+description = "Deterministic spec-compliant capture-file generators used by the e2e gates."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "make-perf"
+path = "src/bin/make_perf.rs"
+
+[[bin]]
+name = "make-core"
+path = "src/bin/make_core.rs"
+
+[[bin]]
+name = "make-sqlite"
+path = "src/bin/make_sqlite.rs"
+
+[[bin]]
+name = "sqlite-check"
+path = "src/bin/sqlite_check.rs"
+
+[[bin]]
+name = "make-pcap"
+path = "src/bin/make_pcap.rs"
+
+[[bin]]
+name = "plant-token"
+path = "src/bin/plant_token.rs"
+
+[[bin]]
+name = "make-planted"
+path = "src/bin/make_planted.rs"
+
+[dependencies]
+byteorder.workspace = true
+rusqlite.workspace = true

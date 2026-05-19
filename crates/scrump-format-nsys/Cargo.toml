@@ -1,0 +1,14 @@
+[package]
+name = "scrump-format-nsys"
+description = "NVIDIA Nsight Systems / Compute (.nsys-rep / .ncu-rep) handler."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+scrump-core = { path = "../scrump-core", version = "0.1.0" }
+scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.0" }
+scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.0" }

@@ -1,0 +1,35 @@
+[package]
+name = "scrump-trufflehog-compat"
+description = "Run TruffleHog's detector test corpus against scrump's engine."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "trufflehog-compat"
+path = "src/main.rs"
+
+[[bin]]
+name = "th-extract"
+path = "src/bin/th_extract.rs"
+
+[[bin]]
+name = "probe"
+path = "src/bin/probe.rs"
+
+[[bin]]
+name = "integration-inventory"
+path = "src/bin/integration_inventory.rs"
+
+[dependencies]
+regex.workspace = true
+serde.workspace = true
+serde_json = "1"
+serde_yaml.workspace = true
+scrump-core = { path = "../scrump-core", version = "0.1.0" }
+scrump-detect = { path = "../scrump-detect", version = "0.1.0" }
+scrump-rules = { path = "../scrump-rules", version = "0.1.0" }

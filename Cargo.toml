@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/scrump-core",
+    "crates/scrump-detect",
+    "crates/scrump-rules",
+    "crates/scrump-format-passthrough",
+    "crates/scrump-format-perf",
+    "crates/scrump-format-tar",
+    "crates/scrump-format-sqlite",
+    "crates/scrump-format-nsys",
+    "crates/scrump-format-core",
+    "crates/scrump-format-hprof",
+    "crates/scrump-format-jfr",
+    "crates/scrump-format-pcap",
+    "crates/scrump-cli",
+    "crates/scrump-test-fixtures",
+    "crates/scrump-trufflehog-compat",
+    "crates/scrump-presidio-compat",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/avifenesh/scrump"
+authors = ["Avi Fenesh"]
+rust-version = "1.75"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "1"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+rayon = "1"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+byteorder = "1"
+tar = "0.4"
+flate2 = "1"
+zstd = "0.13"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+linux-perf-data = "0.10"
+object = { version = "0.36", default-features = false, features = ["std", "read_core", "elf"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+base64 = "0.22"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

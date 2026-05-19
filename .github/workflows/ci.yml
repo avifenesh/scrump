@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  # ------------------------------------------------------------------
+  # 1. Fast feedback: formatting, lints, unit tests
+  # ------------------------------------------------------------------
+  check:
+    name: fmt + clippy + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
+  # ------------------------------------------------------------------
+  # 2. End-to-end phase gates (0 — 7)
+  # ------------------------------------------------------------------
+  e2e:
+    name: phase gates 0..7 (e2e)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: install system tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            zip unzip zstd binutils default-jdk libsqlite3-dev
+
+      - name: build release binary + fixture helpers
+        run: cargo build --workspace --release
+
+      - name: put scrump on PATH
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cp target/release/scrump "$HOME/.local/bin/scrump"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: phase 0 (passthrough)
+        run: bash tests/e2e.sh
+      - name: phase 1 (perf.data)
+        run: bash tests/e2e_phase1.sh
+      - name: phase 2 (tar / tar.gz / tar.zst / zip)
+        run: bash tests/e2e_phase2.sh
+      - name: phase 3 (sqlite + nsys-rep)
+        run: bash tests/e2e_phase3.sh
+      - name: phase 4 (ELF core)
+        run: bash tests/e2e_phase4.sh
+      - name: phase 5 (Java HPROF)
+        run: bash tests/e2e_phase5.sh
+      - name: phase 6 (JFR)
+        run: bash tests/e2e_phase6.sh
+      - name: phase 7 (pcap)
+        run: bash tests/e2e_phase7.sh
+
+  # ------------------------------------------------------------------
+  # 3. TruffleHog compatibility — 864 providers × pattern corpus
+  # ------------------------------------------------------------------
+  compat-trufflehog:
+    name: trufflehog compat (864 providers)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: clone TruffleHog (sparse, pkg/detectors + pkg/common)
+        run: |
+          git clone --depth=1 --filter=blob:none --sparse \
+            https://github.com/trufflesecurity/trufflehog.git vendor/trufflehog
+          ( cd vendor/trufflehog && git sparse-checkout set pkg/detectors pkg/common )
+
+      - name: extract patterns + provider map
+        run: cargo run --release -p scrump-trufflehog-compat --bin th-extract
+
+      - name: run compat harness
+        run: cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
+
+      - name: integration-test inventory
+        run: cargo run --release -p scrump-trufflehog-compat --bin integration-inventory
+
+  # ------------------------------------------------------------------
+  # 4. Presidio cross-format compat — every PII test text embedded
+  #    into every binary format scrump supports
+  # ------------------------------------------------------------------
+  compat-presidio:
+    name: presidio cross-format compat (8 formats)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: clone Presidio (sparse, presidio-analyzer)
+        run: |
+          git clone --depth=1 --filter=blob:none --sparse \
+            https://github.com/microsoft/presidio.git vendor/presidio
+          ( cd vendor/presidio && git sparse-checkout set \
+              presidio-analyzer/presidio_analyzer presidio-analyzer/tests )
+
+      - name: extract Presidio test manifest
+        run: cargo run --release -p scrump-presidio-compat --bin presidio-extract
+
+      - name: run cross-format compat
+        run: cargo run --release -p scrump-presidio-compat --bin presidio-compat

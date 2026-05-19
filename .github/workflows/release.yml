@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            cross: false
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            cross: true
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            cross: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: install cross (Linux aarch64 only)
+        if: matrix.cross
+        run: cargo install cross --locked
+
+      - name: build
+        run: |
+          if [[ "${{ matrix.cross }}" == "true" ]]; then
+            cross build --release --target ${{ matrix.target }} -p scrump-cli
+          else
+            cargo build --release --target ${{ matrix.target }} -p scrump-cli
+          fi
+
+      - name: package
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME}"
+          name="scrump-${ver}-${{ matrix.target }}"
+          mkdir -p "dist/${name}"
+          cp "target/${{ matrix.target }}/release/scrump" "dist/${name}/"
+          cp README.md LICENSE CONTRIBUTING.md "dist/${name}/"
+          ( cd dist && tar -czf "${name}.tar.gz" "${name}" && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrump-${{ matrix.target }}
+          path: dist/scrump-*.tar.gz*
+
+  release:
+    name: publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: flatten artifact tree
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -exec cp {} release/ \;
+          ls -la release
+
+      - name: create release + upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Pick the right tarball for your platform from the assets below.
+
+            ```sh
+            # Linux x86_64
+            curl -L -o scrump.tar.gz https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/scrump-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+
+            tar -xzf scrump.tar.gz
+            sudo install -m 755 scrump-${{ github.ref_name }}-x86_64-unknown-linux-gnu/scrump /usr/local/bin/
+            scrump --version
+            ```
+
+            Verify with the matching `*.sha256` file.
