@@ -6,6 +6,14 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-05-19
+
+### Fixed
+
+- Every published crate now declares `readme = "../../README.md"`, so
+  the crates.io page renders the workspace README instead of an empty
+  description card. No code change.
+
 ## [0.1.0] — 2026-05-19
 
 The first tagged release. Covers every format scrump was designed for,
@@ -63,5 +71,6 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/avifenesh/scrump/releases/tag/v0.1.1
 [0.1.0]: https://github.com/avifenesh/scrump/releases/tag/v0.1.0
