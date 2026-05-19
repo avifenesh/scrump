@@ -83,10 +83,16 @@ ok "phase6: JFR magic intact"
 # scrubber's correctness guarantee. Downstream-tool round-trip is a
 # best-effort property when broad rules are loaded.
 if command -v jfr >/dev/null 2>&1; then
-    if jfr summary "$JFR" >/dev/null 2>&1; then
+    # Wrap in `timeout` because `jfr summary` has been observed to hang
+    # indefinitely (40+ min on GitHub-hosted ubuntu-latest, OpenJDK
+    # bundled `jfr` tool) on a scrubbed file whose varint event stream
+    # corruption puts it into a non-terminating parse loop. The local
+    # OpenJDK exits non-zero on the same corruption. Either is fine for
+    # our purposes — we only need a *bounded* answer.
+    if timeout 30s jfr summary "$JFR" >/dev/null 2>&1; then
         ok "phase6: jfr summary still parses"
     else
-        info "phase6: jfr summary refuses scrubbed file (acceptable with broad rules)"
+        info "phase6: jfr summary refuses or times out on scrubbed file (acceptable with broad rules)"
     fi
 fi
 
