@@ -32,6 +32,11 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --all-targets
 
+      - name: cargo doc (no broken intra-doc links)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --workspace --no-deps --document-private-items
+
   # ------------------------------------------------------------------
   # 2. End-to-end phase gates (0 — 7)
   # ------------------------------------------------------------------

@@ -57,6 +57,8 @@ fn note_blob(name: &str, ntype: u32, desc: &[u8]) -> Vec<u8> {
 /// Build a minimal NT_PRPSINFO descriptor.
 ///
 /// Layout (Linux elf_prpsinfo, 64-bit) — see `include/linux/elfcore.h`:
+///
+/// ```text
 ///   char  pr_state;       // 1
 ///   char  pr_sname;       // 1
 ///   char  pr_zomb;        // 1
@@ -71,6 +73,8 @@ fn note_blob(name: &str, ntype: u32, desc: &[u8]) -> Vec<u8> {
 ///   pid_t pr_sid;         // 4
 ///   char  pr_fname[16];   // 16
 ///   char  pr_psargs[80];  // 80
+/// ```
+///
 /// Total: 136 bytes (64-bit).
 fn prpsinfo(cmdline: &str) -> Vec<u8> {
     let mut buf = Vec::with_capacity(136);

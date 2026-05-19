@@ -19,7 +19,7 @@
 //! appropriate origin label per known tag. Special-case tag 0x01
 //! (UTF8 STRING) which has the layout `id (id_size bytes) +
 //! utf8 string` — we surface the utf8 portion as
-//! [`ChunkOrigin::StringTable("hprof.utf8")`] so the engine concentrates
+//! `ChunkOrigin::StringTable("hprof.utf8")` so the engine concentrates
 //! on what's almost certainly a leak vector.
 //!
 //! Redaction is byte-level zero-fill at absolute file offsets. The
