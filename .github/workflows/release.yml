@@ -103,4 +103,53 @@ jobs:
             scrump --version
             ```
 
+            Or, from crates.io:
+
+            ```sh
+            cargo install scrump-cli
+            ```
+
             Verify with the matching `*.sha256` file.
+
+  publish-crates:
+    name: publish to crates.io
+    needs: build
+    runs-on: ubuntu-latest
+    # crates.io publish order respects the internal dep DAG:
+    #   tier-0 (no internal deps):           scrump-core
+    #   tier-1 (depend on tier-0 only):       scrump-detect, scrump-rules,
+    #     scrump-format-{core,hprof,jfr,passthrough,pcap,perf,sqlite}
+    #   tier-2 (depend on a tier-1 format):   scrump-format-tar
+    #   tier-3 (depends on tier-2):           scrump-format-nsys
+    #   tier-4 (depends on everything):       scrump-cli
+    # A short sleep between publishes lets the index propagate so the next
+    # crate's resolver sees the version we just pushed.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          # tier 0
+          cargo publish -p scrump-core
+          sleep 30
+          # tier 1 — sequential to keep error reporting clean
+          for c in scrump-detect scrump-rules \
+                   scrump-format-core scrump-format-hprof scrump-format-jfr \
+                   scrump-format-passthrough scrump-format-pcap \
+                   scrump-format-perf scrump-format-sqlite; do
+            cargo publish -p "$c"
+            sleep 20
+          done
+          # tier 2
+          cargo publish -p scrump-format-tar
+          sleep 25
+          # tier 3
+          cargo publish -p scrump-format-nsys
+          sleep 25
+          # tier 4
+          cargo publish -p scrump-cli
