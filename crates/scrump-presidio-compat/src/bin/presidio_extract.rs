@@ -145,8 +145,7 @@ fn parse_recognizer(src: &str, stem: &str) -> Option<Recognizer> {
     let entity = ent_pat
         .captures(src)
         .and_then(|c| c.get(1))
-        .map(|m| m.as_str().to_string())
-        .unwrap_or_else(|| stem.to_uppercase());
+        .map_or_else(|| stem.to_uppercase(), |m| m.as_str().to_string());
 
     // Pre-scan module/class-level constants like
     //   BASE_URL_REGEX = r"..."

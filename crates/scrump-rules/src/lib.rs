@@ -110,7 +110,7 @@ mod custom {
                 Regex::new(
                     r"\b(?:eyJ|ewogIC|ewoid)[A-Za-z0-9_-]{8,}={0,2}\.(?:eyJ|ewo)[A-Za-z0-9_-]{8,}={0,2}\.[A-Za-z0-9_-]{8,}",
                 )
-                .unwrap()
+                .expect("hand-written JwtHsAware regex must compile")
             })
         }
         fn min_entropy(&self) -> Option<f64> {

@@ -10,3 +10,6 @@ rust-version.workspace = true
 
 [dependencies]
 scrump-core = { path = "../scrump-core", version = "0.1.0" }
+
+[lints]
+workspace = true

@@ -623,8 +623,7 @@ fn evaluate_case(case: &TestCase, hits: &[&[u8]]) -> Result<(), String> {
 fn char_pos_to_byte(text: &str, char_idx: usize) -> usize {
     text.char_indices()
         .nth(char_idx)
-        .map(|(b, _)| b)
-        .unwrap_or(text.len())
+        .map_or(text.len(), |(b, _)| b)
 }
 
 fn truncate(s: &str, n: usize) -> String {

@@ -135,3 +135,17 @@ jobs:
 
       - name: run cross-format compat
         run: cargo run --release -p scrump-presidio-compat --bin presidio-compat
+
+  # ------------------------------------------------------------------
+  # 5. Supply-chain audit — advisory DB + license allow-list + bans
+  # ------------------------------------------------------------------
+  supply-chain:
+    name: cargo-deny (advisories, licenses, sources)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features

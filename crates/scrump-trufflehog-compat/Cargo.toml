@@ -33,3 +33,6 @@ serde_yaml.workspace = true
 scrump-core = { path = "../scrump-core", version = "0.1.0" }
 scrump-detect = { path = "../scrump-detect", version = "0.1.0" }
 scrump-rules = { path = "../scrump-rules", version = "0.1.0" }
+
+[lints]
+workspace = true

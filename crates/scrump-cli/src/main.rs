@@ -157,8 +157,7 @@ fn scrub(
 fn backup_path(p: &Path) -> PathBuf {
     let mut name = p
         .file_name()
-        .map(|s| s.to_os_string())
-        .unwrap_or_else(|| std::ffi::OsString::from("out"));
+        .map_or_else(|| std::ffi::OsString::from("out"), |s| s.to_os_string());
     name.push(".orig");
     match p.parent() {
         Some(d) if !d.as_os_str().is_empty() => d.join(name),

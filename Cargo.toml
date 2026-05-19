@@ -47,6 +47,27 @@ object = { version = "0.36", default-features = false, features = ["std", "read_
 rusqlite = { version = "0.39", features = ["bundled"] }
 base64 = "0.22"
 
+[workspace.lints.clippy]
+# Curated set: high-signal lints we enforce across the workspace. Adding
+# to this list means new code (and existing code touched by a PR) must
+# satisfy the lint. Removing one needs an explicit reason in the PR
+# description.
+#
+# Notably NOT enforced: unwrap_used / expect_used / panic — those are
+# conventional in test code (every #[test] body uses them) and in
+# compile-time-constant regex bootstraps; warning on them produces
+# noise that drowns out real findings.
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+redundant_closure = "warn"
+map_unwrap_or = "warn"
+manual_map = "warn"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

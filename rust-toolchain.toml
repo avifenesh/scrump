@@ -1,0 +1,6 @@
+# Pinned so local builds and CI use the same toolchain — keeps reproducibility
+# tight without forcing a specific nightly. Bump deliberately, not silently.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

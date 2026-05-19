@@ -13,3 +13,6 @@ regex.workspace = true
 rayon.workspace = true
 tracing.workspace = true
 scrump-core = { path = "../scrump-core", version = "0.1.0" }
+
+[lints]
+workspace = true

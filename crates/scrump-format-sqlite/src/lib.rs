@@ -259,7 +259,12 @@ impl Format for SqliteDb {
         conn.execute("VACUUM", []).map_err(sqlerr)?;
 
         // Close the connection so the file is unlocked and fully flushed.
-        let conn = self.conn.take().unwrap();
+        // `conn` is always Some here — we opened it in `open_path` and only
+        // take() it in this method, which short-circuits if `applied` is set.
+        let conn = self
+            .conn
+            .take()
+            .ok_or_else(|| ScrumpError::Other("sqlite connection already closed".into()))?;
         conn.close().map_err(|(_, e)| sqlerr(e))?;
         self.applied = true;
 
@@ -286,14 +291,12 @@ fn make_tmp_path(hint: Option<&Path>) -> Result<PathBuf> {
         .and_then(|p| p.file_name())
         .and_then(|s| s.to_str())
         .unwrap_or("sqlite");
-    let unique = format!(
-        "scrump-sqlite-{}-{}-{stem}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
+    // System clock before 1970 would make duration_since fail; we fall back
+    // to 0 in that case so we still produce a (less unique but valid) path.
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let unique = format!("scrump-sqlite-{}-{nanos}-{stem}", std::process::id());
     Ok(parent.join(unique))
 }
 

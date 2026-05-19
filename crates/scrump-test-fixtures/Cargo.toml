@@ -40,3 +40,6 @@ path = "src/bin/make_planted.rs"
 [dependencies]
 byteorder.workspace = true
 rusqlite.workspace = true
+
+[lints]
+workspace = true

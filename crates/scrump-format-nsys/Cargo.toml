@@ -12,3 +12,6 @@ rust-version.workspace = true
 scrump-core = { path = "../scrump-core", version = "0.1.0" }
 scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.0" }
 scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.0" }
+
+[lints]
+workspace = true

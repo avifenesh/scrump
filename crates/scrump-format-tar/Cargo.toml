@@ -20,3 +20,6 @@ scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.0" }
 scrump-format-core = { path = "../scrump-format-core", version = "0.1.0" }
 scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.0" }
 scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.0" }
+
+[lints]
+workspace = true
