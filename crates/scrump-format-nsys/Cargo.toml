@@ -10,9 +10,9 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-scrump-core = { path = "../scrump-core", version = "0.1.1" }
-scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.1" }
-scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.1" }
+scrump-core = { path = "../scrump-core", version = "0.1.2" }
+scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.2" }
+scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.2" }
 
 [lints]
 workspace = true

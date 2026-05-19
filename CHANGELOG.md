@@ -6,6 +6,18 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-19
+
+### Added
+
+- Release binary matrix grew from 3 to 7 targets. New: Windows
+  `x86_64-pc-windows-msvc`, Windows `aarch64-pc-windows-msvc`, macOS
+  Intel `x86_64-apple-darwin`, Linux static `x86_64-unknown-linux-musl`.
+  Windows builds package as `.zip`; all others as `.tar.gz`. Each
+  artifact ships with a matching `.sha256` sidecar.
+
+No code change — same crates as 0.1.1.
+
 ## [0.1.1] — 2026-05-19
 
 ### Fixed
@@ -71,6 +83,7 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/avifenesh/scrump/releases/tag/v0.1.2
 [0.1.1]: https://github.com/avifenesh/scrump/releases/tag/v0.1.1
 [0.1.0]: https://github.com/avifenesh/scrump/releases/tag/v0.1.0

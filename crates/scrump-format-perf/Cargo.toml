@@ -12,7 +12,7 @@ rust-version.workspace = true
 [dependencies]
 linux-perf-data.workspace = true
 byteorder.workspace = true
-scrump-core = { path = "../scrump-core", version = "0.1.1" }
+scrump-core = { path = "../scrump-core", version = "0.1.2" }
 
 [lints]
 workspace = true
