@@ -34,6 +34,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "alibaba__keypat",                 // `\b([a-zA-Z0-9]{30})\b` no anchor
     "anypoint__keypat",                // UUID, no keyword anchor
     "anypoint__orgpat",                // keyword `org` is too generic
+    "anypointoauth2__idpat",           // keyword `id` + 32 hex — matches any MD5/UUID-like in logs
     "atlassian_v2__organizationidpat", // keyword `org|id` + UUID
     "auth0managementapitoken__managementapitokenpat", // `\b(ey[a-zA-Z0-9._-]+)\b` unbounded
     "auth0oauth__clientsecretpat",     // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
@@ -41,26 +42,36 @@ pub const TH_QUARANTINE: &[&str] = &[
     "azure_batch__secretpat",          // raw `[A-Za-z0-9+/=]{88}` no anchor
     "azureapimanagement_repositorykey__regex", // `\d+\.\d+\.\d+` — fires on every semver in any log
     "azureapimanagementsubscriptionkey__keypat", // keyword `key` + 32 alnums — fires on every config
+    "boxoauth__clientidpat", // keyword `id` + 32 alnums — duplicate of spotify/shopify hits
+    "boxoauth__clientsecretpat", // keyword `secret` + 32 alnums — matches Go function names
     "boxoauth__subjectidpat", // keyword `user|subject|id` + 6-20 digits — every numeric ID matches
-    "browserstack__keypat",   // keyword `key` + 20 alnums — fires on every env var
-    "browserstack__userpat",  // keyword `user|username` + 9-29 alnums — fires on every env var
-    "clickhelp__emailpat",    // RFC-shaped email pattern, no provider context
-    "clickhelp__keypat",      // keyword `key|token|api|secret` + 24 alnums — every config value
+    "browserstack__keypat",  // keyword `key` + 20 alnums — fires on every env var
+    "browserstack__userpat", // keyword `user|username` + 9-29 alnums — fires on every env var
+    "clickhelp__emailpat",   // RFC-shaped email pattern, no provider context
+    "clickhelp__keypat",     // keyword `key|token|api|secret` + 24 alnums — every config value
     "cloudflareglobalapikey__emailpat", // RFC-shaped email pattern, no provider context
-    "copper__idpat",          // `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b` email
+    "copper__idpat",         // `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b` email
     "currencycloud__emailpat", // RFC-shaped email pattern, no provider context
-    "datadogtoken__apppat",   // keyword `dd` fires on `dd-mm-yyyy` etc.
+    "datadogapikey__apikeypat", // keyword `dd` + 32 alnums — fires on Go fn names
+    "datadogtoken__apipat",  // keyword `dd` + 32 alnums — duplicate of datadogapikey
+    "datadogtoken__apppat",  // keyword `dd` fires on `dd-mm-yyyy` etc.
     "digitaloceantoken__keypat", // keyword `do` matches every English `do`
+    "dockerhub_v1__usernamepat", // keyword `docker|id` + 4-40 alnums — matches `network`
     "dockerhub_v2__emailpat", // RFC-shaped email pattern, no provider context
     "dockerhub_v2__usernamepat", // keyword `id` matches every config field
-    "docusign__idpat",        // keyword `integration|id` + UUID
-    "dotdigital__passpat",    // keyword `pw|pass` fires on every config password line
-    "easyinsight__idpat",     // keyword `id` + 20 alnums — every random env value
-    "easyinsight__keypat",    // keyword `key` + 20 alnums — every random env value
-    "flowflu__accountpat",    // keyword `account` is too generic
-    "gemini__secretpat",      // unanchored 27-28 char alnum
-    "gitlaboauth2__clientidpat", // keyword `id` + 64 hex
-    "jdbc__pattern",          // `(?i)pass.*?=(.+?)\b` matches any config `password=...` line
+    "docusign__idpat",       // keyword `integration|id` + UUID
+    "dotdigital__passpat",   // keyword `pw|pass` fires on every config password line
+    "easyinsight__idpat",    // keyword `id` + 20 alnums — every random env value
+    "easyinsight__keypat",   // keyword `key` + 20 alnums — every random env value
+    "elevenlabs_v1__keypat", // keyword `el` matches `elephant`, `panel`, `level`, etc.
+    "clicksendsms__keypat",  // `\b([0-9A-Z]{8}-...-{12})\b` UUID, no keyword
+    "flowflu__accountpat",   // keyword `account` is too generic
+    "gcpapplicationdefaultcredentials__keypat", // `\{[^{]+client_secret[^}]+\}` greedy — captured 8KB JSON
+    "gemini__secretpat",                        // unanchored 27-28 char alnum
+    "github_oauth2__oauth2clientsecretpat", // keyword `github` + 40 hex — matches every git SHA-1
+    "gitlaboauth2__clientidpat",            // keyword `id` + 64 hex
+    "graphcms__idpat", // keyword `graph` + 25 alnums — matches GraphQL identifiers
+    "jdbc__pattern",   // `(?i)pass.*?=(.+?)\b` matches any config `password=...` line
     "jiratoken_v2__domainpat", // `\b((?:[a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]{2,16})\b` matches every dotted hostname
     "jiratoken_v2__emailpat",  // RFC-shaped email pattern, no provider context
     "ldap__passwordpat",       // keyword `pass` + quoted 4-48 chars — every config `password='…'`
@@ -69,9 +80,13 @@ pub const TH_QUARANTINE: &[&str] = &[
     "mapbox__idpat",           // `([a-zA-Z-0-9]{4,32})` no boundary, no keyword
     "mrticktock__emailpat",    // RFC-shaped email pattern, no provider context
     "netsuite__accountidpat",  // keyword `id|account|netsuite` too broad
-    "onedesk__emailpat",       // RFC-shaped email pattern, no provider context
-    "onelogin__oauthclientidpat", // keyword `id` + 64 lowercase hex
-    "openvpn__clientsecretpat", // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
+    "netsuite__consumerkeypat", // keyword `consumer|key` + 64 alnums — matches SHA-256-shape
+    "netsuite__consumersecretpat", // keyword `consumer|secret` + 64 alnums — matches placeholder zeros
+    "netsuite__tokenkeypat",       // keyword `token|key` + 64 alnums — duplicate of consumerkey
+    "netsuite__tokensecretpat",    // keyword `token|secret` + 64 alnums — matches placeholder zeros
+    "onedesk__emailpat",           // RFC-shaped email pattern, no provider context
+    "onelogin__oauthclientidpat",  // keyword `id` + 64 lowercase hex
+    "openvpn__clientsecretpat",    // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
     "paypaloauth__keypat", // `\b([A-Za-z0-9_\.\-]{44,80})\b` no anchor; needs hand-coded rule in default.yaml
     "planetscale__usernamepat", // `\b[a-z0-9]{12}\b` no keyword
     "planetscaledb__usernamepat", // `\b[a-z0-9]{20}\b` no keyword
@@ -82,20 +97,27 @@ pub const TH_QUARANTINE: &[&str] = &[
     "salesforceoauth2__consumersecretpat", // keyword `secret|consumer` + 19-64 alnums
     "salesforcerefreshtoken__consumersecretpat", // same shape as above
     "saucelabs__usernamepat", // keyword `username` + 2-70 alnums — too loose
-    "sourcegraph__keypat", // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
-    "sparkpost__keypat",   // `\b([a-zA-Z0-9]{40})\b` no anchor
+    "shopifyoauth__clientidpat", // keyword `id` + 32 alnums — duplicate hits of spotify/box
+    "signable__keywordpat", // `(?i)([a-z]{2})signable` matches `assignable`, captures only 2 chars
+    "signable__tokenpat",  // `.{0,2}signable` matches `assignable` followed by 32 alnums
+    "snowflake__accountidentifierpat", // keyword `account` + 7-262 chars — matches arbitrary identifiers
+    "sourcegraph__keypat",             // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
+    "sparkpost__keypat",               // `\b([a-zA-Z0-9]{40})\b` no anchor
+    "spotifykey__idpat",               // keyword `id` + 32 alnums — duplicate hits of shopify/box
+    "spotifykey__secretpat", // keyword `key|secret` + 32 alnums — matches Go function names
     "tableau__tokennamepat", // keyword `name` is too generic
     "trelloapikey__tokenpat", // `\b([a-zA-Z-0-9]{64})\b` no anchor
-    "tru__keypat",         // keyword `tru` + UUID — same broken keyword as tru__secrepat
-    "tru__secrepat",       // keyword `tru` matches `true`, `trust`, etc.
-    "twilio__keypat",      // `\b[0-9a-f]{32}\b` — matches every MD5 / 32-char hex
+    "tru__keypat",           // keyword `tru` + UUID — same broken keyword as tru__secrepat
+    "tru__secrepat",         // keyword `tru` matches `true`, `trust`, etc.
+    "twilio__keypat",        // `\b[0-9a-f]{32}\b` — matches every MD5 / 32-char hex
     "twilioapikey__secretpat", // `\b[0-9a-zA-Z]{32}\b` no anchor
-    "wepay__appidpat",     // `\b(\d{6})\b` — every six-digit number
-    "zendeskapi__email",   // email pattern, no provider context
-    "zipapi__emailpat",    // RFC-shaped email pattern, no provider context
-    "zipbooks__emailpat",  // RFC-shaped email pattern, no provider context
-    "zipbooks__pwordpat",  // keyword `zipbooks|password` fires on every config
-    "zulipchat__idpat",    // email pattern, no provider context
+    "user__keypat", // keyword `user` + 64 chars — matches Google profile photo URL fragments
+    "wepay__appidpat", // `\b(\d{6})\b` — every six-digit number
+    "zendeskapi__email", // email pattern, no provider context
+    "zipapi__emailpat", // RFC-shaped email pattern, no provider context
+    "zipbooks__emailpat", // RFC-shaped email pattern, no provider context
+    "zipbooks__pwordpat", // keyword `zipbooks|password` fires on every config
+    "zulipchat__idpat", // email pattern, no provider context
 ];
 
 /// Returns `true` when a rule id is part of the active ruleset — i.e. it
