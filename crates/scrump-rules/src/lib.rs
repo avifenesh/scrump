@@ -42,6 +42,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "anypointoauth2__idpat", // keyword `id` + 32 hex — matches any MD5/UUID-like in logs
     "atlassian_v2__organizationidpat", // keyword `org|id` + UUID
     "auth0managementapitoken__managementapitokenpat", // `\b(ey[a-zA-Z0-9._-]+)\b` unbounded
+    "auth0oauth__clientidpat", // keyword `auth0` + 32-60 chars — matches Go string concatenations
     "auth0oauth__clientsecretpat", // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
     "aws_session_keys__sessionpat", // `[a-zA-Z0-9+/]{100,}` unbounded — eats megabytes
     "azure_batch__secretpat", // raw `[A-Za-z0-9+/=]{88}` no anchor
@@ -81,14 +82,17 @@ pub const TH_QUARANTINE: &[&str] = &[
     "dotdigital__passpat", // keyword `pw|pass` fires on every config password line
     "easyinsight__idpat", // keyword `id` + 20 alnums — every random env value
     "easyinsight__keypat", // keyword `key` + 20 alnums — every random env value
+    "elasticemail__keypat", // keyword `elastic` + 96 destructive chars — matches Go TLD data tables
     "eightxeight__idpat", // keyword `8x8` + 18-30 alnums — matches `8x8 grid`/`8x8 pixel` text
     "elevenlabs_v1__keypat", // keyword `el` matches `elephant`, `panel`, `level`, etc.
+    "clicksendsms__idpat", // keyword `sms` + email pattern — matches Go module paths
     "clicksendsms__keypat", // `\b([0-9A-Z]{8}-...-{12})\b` UUID, no keyword
     "clientary__idpat", // keyword `ronin|clientary` + 4-25 chars — matches Go fn names like `StringifyMapKeysWithFmt`
     "clockworksms__tokenpat", // keyword `clockwork|textanywhere` + 24 alnums — fires on Go fn names
     "dockerhub_v1__emailpat", // keyword `docker` + email pattern — Go module paths `github.com/x/y@v1.2.3` trigger the `@`
     "flowflu__accountpat",    // keyword `account` is too generic
     "formbucket__keypat", // keyword `formbucket` + 3 unbounded dotted segments — matches `storage.Notification.Config`
+    "front__keypat", // keyword `front` matches `frontend`/`confrontation` + 36+188 destructive chars
     "gcpapplicationdefaultcredentials__keypat", // `\{[^{]+client_secret[^}]+\}` greedy — captured 8KB JSON
     "gemini__secretpat",                        // unanchored 27-28 char alnum
     "github_oauth2__oauth2clientidpat", // keyword `github` + 20 alnums — matches GraphQL type names like `CheckConclusionState`
@@ -96,6 +100,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "githubapp__apppat",                // keyword `github` + 6 digits — matches any 6-digit run
     "gitlaboauth2__clientidpat",        // keyword `id` + 64 hex
     "graphcms__idpat",                  // keyword `graph` + 25 alnums — matches GraphQL identifiers
+    "hashicorpvaultauth__roleidpat", // keyword `role` + UUID — `role` matches every k8s/IAM role string
     "hashicorpvaultauth__secretidpat", // keyword `secret` + UUID — duplicate of docusign__secretpat
     "hive__idpat", // keyword `hive` + 17 alnums — matches code identifiers like `archiveItemConfig`
     "host__keypat", // keyword `host` + 14 lowercase alnum — matches `addressunknown`, etc.
@@ -107,14 +112,18 @@ pub const TH_QUARANTINE: &[&str] = &[
     "ldap__usernamepat",       // keyword `user` + any quoted string
     "lessannoyingcrm__keypat", // keyword `less` matches `lesson`, `endless`, etc.
     "lob__keypat", // keyword `lob` matches `blob`/`global`/`globe` — captures git SHA-1s in Cargo.lock
+    "luno__idpat", // keyword `luno` matches words like `gluon`/`Lunos` + 13 alnums
+    "luno__keypat", // keyword `luno` + 43 chars — same broken keyword
     "magicbell__emailpat", // RFC-shaped email pattern, no provider context
     "manifest__keypat", // keyword `manifest` + 32 alnums — matches arbitrary code identifiers
     "mapbox__idpat", // `([a-zA-Z-0-9]{4,32})` no boundary, no keyword
     "mite__keypat", // keyword `mite` matches `committed`/`permitted`/`submit`
     "mongodb__placeholderpasswordpat", // `^[xX]+|\*+$` matches any line starting with x/X or ending with * — broken
-    "mrticktock__emailpat",            // RFC-shaped email pattern, no provider context
-    "netsuite__accountidpat",          // keyword `id|account|netsuite` too broad
-    "netsuite__consumerkeypat",        // keyword `consumer|key` + 64 alnums — matches SHA-256-shape
+    "mux__secretpat", // keyword `mux` matches `demultiplexer`/`multiplex` + 75 base64 chars
+    "myfreshworks__idpat", // keyword `freshworks` + 2-20 chars — captures generic words like `freshdesk`
+    "mrticktock__emailpat", // RFC-shaped email pattern, no provider context
+    "netsuite__accountidpat", // keyword `id|account|netsuite` too broad
+    "netsuite__consumerkeypat", // keyword `consumer|key` + 64 alnums — matches SHA-256-shape
     "netsuite__consumersecretpat", // keyword `consumer|secret` + 64 alnums — matches placeholder zeros
     "netsuite__tokenkeypat",       // keyword `token|key` + 64 alnums — duplicate of consumerkey
     "netsuite__tokensecretpat",    // keyword `token|secret` + 64 alnums — matches placeholder zeros
@@ -141,12 +150,16 @@ pub const TH_QUARANTINE: &[&str] = &[
     "signable__tokenpat", // `.{0,2}signable` matches `assignable` followed by 32 alnums
     "snowflake__accountidentifierpat", // keyword `account` + 7-262 chars — matches arbitrary identifiers
     "sourcegraph__keypat",             // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
-    "swell__idpat", // keyword `swell` matches `Wellknown`/`isWellFormed` + 6-24 alnums
-    "sparkpost__keypat", // `\b([a-zA-Z0-9]{40})\b` no anchor
-    "spotifykey__idpat", // keyword `id` + 32 alnums — duplicate hits of shopify/box
+    "smartsheets__keypat", // keyword `sheet` matches `worksheet`/`spreadsheet` + 26-37 alnums — Go type names
+    "sumologickey__keypat", // keyword `sumo|accessKey` + 64 alnums — `accessKey` too generic
+    "swell__idpat",        // keyword `swell` matches `Wellknown`/`isWellFormed` + 6-24 alnums
+    "sparkpost__keypat",   // `\b([a-zA-Z0-9]{40})\b` no anchor
+    "spotifykey__idpat",   // keyword `id` + 32 alnums — duplicate hits of shopify/box
     "spotifykey__secretpat", // keyword `key|secret` + 32 alnums — matches Go function names
     "tableau__tokennamepat", // keyword `name` is too generic
+    "thinkific__domainpat", // keyword `thinkific` + 4-40 alnums — captures generic words like `uploader`/`wordpress`
     "twitterconsumerkey__keypat", // keyword `consumer|key` + 25 alnums — matches Go fn names like `generateClientKeyExchange`
+    "unifyid__keypat",            // keyword `unify` matches `unified`/`unifying` + 44 alnums
     "verifier__emailpat", // keyword `verifier` + RFC email pattern — fires on any @-shaped Go module path
     "wiz__secretpat",     // keyword `wiz` matches `Wizard`/`bewildering` + 64 alnums
     "trelloapikey__tokenpat", // `\b([a-zA-Z-0-9]{64})\b` no anchor
