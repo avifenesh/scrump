@@ -26,19 +26,19 @@ byteorder.workspace = true
 tar.workspace = true
 flate2.workspace = true
 rusqlite.workspace = true
-scrump-core = { path = "../scrump-core", version = "0.1.5" }
-scrump-detect = { path = "../scrump-detect", version = "0.1.5" }
-scrump-rules = { path = "../scrump-rules", version = "0.1.5" }
-scrump-test-fixtures = { path = "../scrump-test-fixtures", version = "0.1.5" }
-scrump-format-passthrough = { path = "../scrump-format-passthrough", version = "0.1.5" }
-scrump-format-perf = { path = "../scrump-format-perf", version = "0.1.5" }
-scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.5" }
-scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.5" }
-scrump-format-nsys = { path = "../scrump-format-nsys", version = "0.1.5" }
-scrump-format-core = { path = "../scrump-format-core", version = "0.1.5" }
-scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.5" }
-scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.5" }
-scrump-format-pcap = { path = "../scrump-format-pcap", version = "0.1.5" }
+scrump-core = { path = "../scrump-core", version = "0.1.6" }
+scrump-detect = { path = "../scrump-detect", version = "0.1.6" }
+scrump-rules = { path = "../scrump-rules", version = "0.1.6" }
+scrump-test-fixtures = { path = "../scrump-test-fixtures", version = "0.1.6" }
+scrump-format-passthrough = { path = "../scrump-format-passthrough", version = "0.1.6" }
+scrump-format-perf = { path = "../scrump-format-perf", version = "0.1.6" }
+scrump-format-tar = { path = "../scrump-format-tar", version = "0.1.6" }
+scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.6" }
+scrump-format-nsys = { path = "../scrump-format-nsys", version = "0.1.6" }
+scrump-format-core = { path = "../scrump-format-core", version = "0.1.6" }
+scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.6" }
+scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.6" }
+scrump-format-pcap = { path = "../scrump-format-pcap", version = "0.1.6" }
 
 [lints]
 workspace = true
