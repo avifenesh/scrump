@@ -14,13 +14,13 @@ tar.workspace = true
 flate2.workspace = true
 zstd.workspace = true
 zip.workspace = true
-scrump-core = { path = "../scrump-core", version = "0.1.3" }
-scrump-format-passthrough = { path = "../scrump-format-passthrough", version = "0.1.3" }
-scrump-format-perf = { path = "../scrump-format-perf", version = "0.1.3" }
-scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.3" }
-scrump-format-core = { path = "../scrump-format-core", version = "0.1.3" }
-scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.3" }
-scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.3" }
+scrump-core = { path = "../scrump-core", version = "0.1.4" }
+scrump-format-passthrough = { path = "../scrump-format-passthrough", version = "0.1.4" }
+scrump-format-perf = { path = "../scrump-format-perf", version = "0.1.4" }
+scrump-format-sqlite = { path = "../scrump-format-sqlite", version = "0.1.4" }
+scrump-format-core = { path = "../scrump-format-core", version = "0.1.4" }
+scrump-format-hprof = { path = "../scrump-format-hprof", version = "0.1.4" }
+scrump-format-jfr = { path = "../scrump-format-jfr", version = "0.1.4" }
 
 [lints]
 workspace = true
