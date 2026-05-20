@@ -6,6 +6,43 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-05-20
+
+### Fixed
+
+- Continued the issue #9 real-artifact iteration through rounds 6–10,
+  expanding `TH_QUARANTINE` from 145 to 170 patterns. New corpus shapes:
+  container layers, ONNX/TFLite ML models, JS runtimes (Bun, Deno),
+  Firefox, Windows PE binaries (Rust), Jupyter notebooks, k8s manifests,
+  Helm charts, CA cert bundles, parquet, Apache PowerShell/.NET, DuckDB,
+  Zig, Swift sources, a Haskell binary, SQLite C amalgamation, the
+  Terraform AWS provider, and Grafana (Go binary + web assets).
+  - Rounds 7 (media/WASM/font/SQL) and 8 (Windows PE/YAML/Jupyter)
+    surfaced **zero** new noise — those shapes carry no token-like
+    strings.
+  - Rounds 6, 9, and 10 surfaced the remaining provider-keyword rules
+    that fire on compiled-binary identifier tables and JS bundles
+    (`grafana`→`drone.grafana.net`, `roaring`→bitmap-library symbols,
+    `polygon`→geometry code, `chatbot`/`customerguru`/`algolia`→AWS-SDK
+    Go function names, `redis`→the word `password`, etc.).
+  - Worst-case per-MB hit rate on the round 6–10 corpus (excluding the
+    deliberately-kept dual-use rules below): media/WASM/PE/source/cert
+    artifacts 0/MB; Go binaries ≤0.9/MB.
+
+### Notes
+
+- **Deliberately kept** as real (low-FP, structurally-anchored)
+  detectors despite looking broad: `okta__domainpat`, `ldap__uripat`,
+  `hashicorpvaultauth__vaulturlpat`, `grafanaserviceaccount__keypat`
+  (real `glsa_` tokens), `privatekey__keypat`, `okta__tokenpat` (catches
+  real `00…` Okta tokens), and `azure_cosmosdb__dbkeypattern` — the last
+  is unanchored (`[A-Za-z0-9]{86}==`) and is the single largest remaining
+  hit source on base64-dense artifacts, but it is genuinely dual-use
+  (it caught real Grafana API-key JSON blobs in the corpus), so it stays
+  pending a keyword-anchored replacement in `default.yaml`.
+- The `fn_marquee` false-negative guard continues to pass: all 21
+  marquee secret types remain detected after the expanded curation.
+
 ## [0.1.4] — 2026-05-20
 
 ### Fixed
@@ -170,7 +207,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/avifenesh/scrump/releases/tag/v0.1.5
 [0.1.4]: https://github.com/avifenesh/scrump/releases/tag/v0.1.4
 [0.1.3]: https://github.com/avifenesh/scrump/releases/tag/v0.1.3
 [0.1.2]: https://github.com/avifenesh/scrump/releases/tag/v0.1.2
