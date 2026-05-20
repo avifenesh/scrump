@@ -6,6 +6,37 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-05-20
+
+### Fixed
+
+- Extended the issue #9 rule curation from 82 to 145 quarantined
+  patterns by running a download → scan → classify → delete loop across
+  ~25 diverse real-world artifacts in five rounds: OSS release tarballs,
+  Rust crates, npm packages, Java JARs, Python wheels, a PDF, Debian
+  packages, JFR + HPROF dumps, public SQLite databases, pcaps, and Go
+  binaries (gh, kubectl, helm, terraform, consul, vault, etcd, k9s,
+  prometheus, caddy, restic, the Go + Node.js toolchains). Each round
+  used artifact shapes the prior rounds hadn't seen, surfacing new
+  broken patterns. The dominant new class was keyword anchors matching
+  ordinary identifiers in compiled binaries — e.g. `azure` matching Go
+  function names, `secret`/`role` matching UUID-shaped trace IDs, `box`
+  matching `inbox`, `lob` matching `global`, `aha` matching `Sahara`,
+  and provider keywords matching Go's net/url TLD data tables. Worst-
+  case per-MB hit rate on the corpus dropped from 22–509 hits/MB to
+  ≤0.27 hits/MB; aggregate ~0.06 hits/MB across ~440 MB of Go binaries.
+
+### Added
+
+- `scrump-rules` integration test `fn_marquee` — a false-negative guard
+  that plants real-shaped secrets for all 21 marquee provider types
+  (GitHub, HuggingFace, OpenAI, Anthropic, AWS, Google, Slack, NVIDIA,
+  WandB, Stripe, JWT) and asserts each is still detected by
+  `default_detectors()` after curation. Pins the guarantee that
+  quarantining noisy rules never silently turns a true positive into a
+  leak. Verified out-of-band that `scrub` removes all 21 from raw text,
+  tar members, and SQLite cells with zero leaks.
+
 ## [0.1.3] — 2026-05-20
 
 ### Fixed
@@ -139,7 +170,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/avifenesh/scrump/releases/tag/v0.1.4
 [0.1.3]: https://github.com/avifenesh/scrump/releases/tag/v0.1.3
 [0.1.2]: https://github.com/avifenesh/scrump/releases/tag/v0.1.2
 [0.1.1]: https://github.com/avifenesh/scrump/releases/tag/v0.1.1
