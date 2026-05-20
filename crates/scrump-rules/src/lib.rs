@@ -232,6 +232,23 @@ pub const TH_QUARANTINE: &[&str] = &[
     "fastlypersonaltoken__keypat", // keyword `fastly` + 32 alnums — matches punycode TLD data
     // Round 15 (composer/elixir/bitcoin/victoriametrics): composer doc string.
     "atlassian_v1__keypat", // captured `oauth-on-bitbucket-cloud` doc string
+    // Round 17 (.NET SDK / NuGet / Nim / Crystal): .NET assembly method names.
+    "pepipost__keypat", // captured `BuildArgumentsBaseOnEnumTypeName` .NET method names
+    "fixerio__keypat",  // captured `InferTypeInNamedFieldInitializer` .NET method names
+    "karmacrm__keypat", // captured `JavaScriptSerializer`
+    "typeform_v1__keypat", // bare-charclass on .NET symbols
+    // Round 18 (rclone/vector/minio/nats/tailscale Go binaries).
+    "cloudinary__cloudnamepat",         // captured `users`
+    "imagekit__keypat",                 // Go string concatenations
+    "apimatic__apikeypat",              // Go string concatenations
+    "splunkobservabilitytoken__keypat", // captured `SplunkEventEncodeError` Go symbols
+    "rabbitmq__keypat",                 // captured the word `password`
+    // Round 19 (Spark/Kafka/Elasticsearch/wasmtime): ES Lucene/config strings.
+    "demio__secretpat", // captured the word `AvantGarde`
+    // Round 20 (LLVM/gitlab-runner/step-ca/packer/nomad Go binaries).
+    "sentrytoken_v1__keypat", // Go symbols in gitlab-runner
+    "accuweather_v1__keypat", // captured `ridgewaterBrightscope…` Go concat
+    "miro__keypat",           // captured `cubesilverfishvindicator…` Go concat
 ];
 
 /// Rules that the structural heuristic ([`pattern_is_structurally_noisy`])
