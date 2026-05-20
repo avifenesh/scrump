@@ -201,12 +201,162 @@ pub const TH_QUARANTINE: &[&str] = &[
     "zulipchat__idpat",   // email pattern, no provider context
 ];
 
-/// Returns `true` when a rule id is part of the active ruleset — i.e. it
-/// is not on the quarantine list. Exposed so the TruffleHog compat harness
-/// can honor the same curation when consulting the auto-generated
-/// `provider_map.json`.
+/// Rules that the structural heuristic ([`pattern_is_structurally_noisy`])
+/// would flag, but that we deliberately keep active because they catch
+/// real secrets despite a value pattern with no fixed literal anchor.
+///
+/// - `azure_cosmosdb__dbkeypattern` — `[A-Za-z0-9]{86}==` is unanchored
+///   but genuinely dual-use (it caught real Grafana API-key JSON blobs in
+///   the issue #9 corpus). Largest remaining hit source on base64-dense
+///   files; pending a keyword-anchored replacement in `default.yaml`.
+/// - `okta__tokenpat` — `\b00[a-zA-Z0-9_-]{40}\b` has only a 2-char `00`
+///   anchor but catches real `00…`-prefixed Okta API tokens at a low
+///   measured FP rate (~0.07 hits/MB).
+const STRUCTURAL_ALLOWLIST: &[&str] = &["azure_cosmosdb__dbkeypattern", "okta__tokenpat"];
+
+/// Returns `true` when a rule id is part of the active ruleset — i.e. it is
+/// neither on the explicit [`TH_QUARANTINE`] list nor flagged by the
+/// structural heuristic. Exposed so the TruffleHog compat harness can honor
+/// the same curation when consulting the auto-generated `provider_map.json`.
 pub fn rule_is_active(id: &str) -> bool {
-    !TH_QUARANTINE.contains(&id)
+    !TH_QUARANTINE.contains(&id) && !structural_quarantine().contains(id)
+}
+
+/// Provider prefix of a rule id (`anypoint__keypat` → `anypoint`).
+fn provider_of(id: &str) -> &str {
+    id.split("__").next().unwrap_or(id)
+}
+
+/// Set of auto-extracted rule ids flagged by [`pattern_is_structurally_noisy`],
+/// computed once from the embedded TruffleHog ruleset.
+///
+/// This is the durable second layer beyond the hand-verified
+/// [`TH_QUARANTINE`] list, but it is deliberately conservative: it only
+/// quarantines a rule when that rule's **provider already has at least one
+/// explicitly-quarantined rule** *and* the rule's value pattern is a bare
+/// character class. In other words, once a provider is proven to emit
+/// noise on real artifacts, its sibling rules of the same broken shape are
+/// swept up automatically — but a provider we've never seen misbehave is
+/// never silently dropped (which would be an unobservable recall loss for
+/// a scrubber, where under-redaction is a leak).
+///
+/// A blanket "no value literal → quarantine" rule would flag ~80% of the
+/// 1,149 TruffleHog providers; most of those never actually fire on real
+/// inputs because their keyword is distinctive, so dropping them only
+/// costs recall. Scoping to known-noisy providers keeps the precision win
+/// without the recall cost.
+fn structural_quarantine() -> &'static std::collections::HashSet<String> {
+    use std::sync::OnceLock;
+    static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
+    SET.get_or_init(|| {
+        let noisy_providers: std::collections::HashSet<&str> =
+            TH_QUARANTINE.iter().map(|id| provider_of(id)).collect();
+        let file: RulesFile = match serde_yaml::from_str(TRUFFLEHOG_RULES_YAML) {
+            Ok(f) => f,
+            Err(_) => return std::collections::HashSet::new(),
+        };
+        file.rules
+            .into_iter()
+            .filter(|r| {
+                noisy_providers.contains(provider_of(&r.id))
+                    && pattern_is_structurally_noisy(&r.id, &r.pattern)
+            })
+            .map(|r| r.id)
+            .collect()
+    })
+}
+
+/// Heuristic: a rule produces unusable scrubber noise when its **value**
+/// pattern (what gets captured/redacted, ignoring any leading
+/// `PrefixRegex` keyword context) contains no fixed literal alphanumeric
+/// run of length ≥ 3.
+///
+/// Real secret formats carry a distinctive literal — `ghp_`, `AKIA`,
+/// `nvapi-`, `sk-ant-`, `xoxb-`, `glsa_`, `BEGIN … PRIVATE KEY`, an
+/// `.okta.com` host, etc. A value that is pure character classes +
+/// quantifiers + anchors (`\b([0-9a-zA-Z]{32})\b`) matches any identifier
+/// of that length, so anchoring it on a keyword produces false positives
+/// wherever that keyword appears incidentally (it always does in a binary
+/// that vendors the provider's SDK).
+///
+/// Applied only to rules whose provider is already known noisy (see
+/// [`structural_quarantine`]). The [`STRUCTURAL_ALLOWLIST`] exempts
+/// deliberately-kept dual-use rules.
+fn pattern_is_structurally_noisy(id: &str, pattern: &str) -> bool {
+    if STRUCTURAL_ALLOWLIST.contains(&id) {
+        return false;
+    }
+    !has_literal_anchor(value_part(pattern), 3)
+}
+
+/// Strip a leading auto-extracted `PrefixRegex` keyword context
+/// (`(?i:kw1|kw2)(?:.|[\n\r]){0,N}?`) or a leading `(?i)` global flag,
+/// returning the value portion of the pattern. The keyword context only
+/// says *where* to look; the value says *what* to capture, and that is
+/// what determines whether the match identifies a real secret.
+fn value_part(pattern: &str) -> &str {
+    let marker = "(?:.|[\\n\\r]){0,";
+    if let Some(i) = pattern.find(marker) {
+        let after = &pattern[i + marker.len()..];
+        if let Some(j) = after.find("}?") {
+            return &after[j + 2..];
+        }
+    }
+    pattern.strip_prefix("(?i)").unwrap_or(pattern)
+}
+
+/// True if `s` contains a run of at least `min_run` consecutive literal
+/// alphanumeric characters — i.e. characters that are part of the matched
+/// text, not regex metacharacters, character-class contents, quantifier
+/// digits, or escape sequences.
+fn has_literal_anchor(s: &str, min_run: usize) -> bool {
+    let b = s.as_bytes();
+    let mut i = 0;
+    let mut run = 0usize;
+    let mut in_class = false;
+    let mut in_brace = false;
+    while i < b.len() {
+        let c = b[i];
+        if c == b'\\' {
+            // Escape sequence (`\b`, `\d`, `\.`): consumes the next char,
+            // never a literal.
+            run = 0;
+            i += 2;
+            continue;
+        }
+        match c {
+            b'[' if !in_class => {
+                in_class = true;
+                run = 0;
+            }
+            b']' if in_class => {
+                in_class = false;
+                run = 0;
+            }
+            b'{' if !in_class => {
+                in_brace = true;
+                run = 0;
+            }
+            b'}' if in_brace => {
+                in_brace = false;
+                run = 0;
+            }
+            _ if in_class || in_brace => {
+                run = 0;
+            }
+            _ if c.is_ascii_alphanumeric() => {
+                run += 1;
+                if run >= min_run {
+                    return true;
+                }
+            }
+            _ => {
+                run = 0;
+            }
+        }
+        i += 1;
+    }
+    false
 }
 
 #[derive(Debug, Deserialize)]
@@ -392,6 +542,25 @@ mod tests {
             ids.contains(&"github_pat_classic"),
             "missing github_pat_classic in default ruleset: {ids:?}"
         );
+    }
+
+    #[test]
+    #[ignore = "diagnostic — run with --ignored --nocapture"]
+    fn structural_quarantine_stats() {
+        let file: RulesFile = serde_yaml::from_str(TRUFFLEHOG_RULES_YAML).unwrap();
+        let total = file.rules.len();
+        let explicit = TH_QUARANTINE.len();
+        let structural = structural_quarantine().len();
+        let only_structural = structural_quarantine()
+            .iter()
+            .filter(|id| !TH_QUARANTINE.contains(&id.as_str()))
+            .count();
+        let active = file.rules.iter().filter(|r| rule_is_active(&r.id)).count();
+        println!("total TH rules:            {total}");
+        println!("explicit TH_QUARANTINE:    {explicit}");
+        println!("structural-flagged:        {structural}");
+        println!("  new (not in explicit):   {only_structural}");
+        println!("active after both layers:  {active}");
     }
 
     #[test]

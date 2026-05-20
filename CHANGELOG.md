@@ -6,6 +6,32 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Structural quarantine heuristic in `scrump-rules` — a durable second
+  layer beyond the hand-verified `TH_QUARANTINE` list (issue #9). It
+  auto-quarantines an auto-extracted rule when (a) the rule's provider
+  already has at least one explicitly-quarantined rule and (b) the
+  rule's *value* pattern (ignoring the `PrefixRegex` keyword context)
+  carries no fixed ≥3-char literal anchor — the bare-character-class
+  shape (`\b([0-9a-zA-Z]{32})\b`) that floods compiled binaries and
+  minified JS. Once a provider is proven noisy on real artifacts, its
+  sibling rules of the same broken shape are swept up without each one
+  being named.
+  - Deliberately scoped to known-noisy providers: a blanket "no value
+    literal" rule would flag ~80% (925/1149) of providers, most of
+    which never fire on real inputs — dropping them would only cost
+    recall (a silent leak for a scrubber). The provider-scoped form
+    sweeps up 39 additional sibling rules and leaves 942 providers
+    active.
+  - Effect on the TruffleHog parity harness: 184 → 156 known
+    cross-provider false positives, with every positive case preserved.
+  - Guarded by two tests: `structural_heuristic` (never flags a rule
+    with a distinctive literal; always flags bare-charclass siblings)
+    and the existing `fn_marquee` (all 21 marquee secret types still
+    detected). Dual-use exceptions (`azure_cosmosdb__dbkeypattern`,
+    `okta__tokenpat`) are allowlisted.
+
 ## [0.1.5] — 2026-05-20
 
 ### Fixed
