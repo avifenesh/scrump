@@ -199,6 +199,39 @@ pub const TH_QUARANTINE: &[&str] = &[
     "zipbooks__emailpat", // RFC-shaped email pattern, no provider context
     "zipbooks__pwordpat", // keyword `zipbooks|password` fires on every config
     "zulipchat__idpat",   // email pattern, no provider context
+    // Round 11 (cloud/devops CLIs: aws-cli, minikube, gitleaks, the
+    // TruffleHog binary itself). One id per provider — the structural
+    // heuristic sweeps each provider's bare-charclass siblings.
+    "geocodio__searchpat", // keyword `geocod` + `\S{7,30}` — captured HTML/JSON fragments in botocore models
+    "maxmindlicense_v1__keypat", // matched `PutGeoipDatabase` Go symbol
+    "sugester__domainpat", // captured `github.com` near keyword — loose domain match
+    "kanbantool__domainpat", // captured `Scanner`/`Agithub` — loose domain match
+    "scalr__idpat",        // captured `slack`/`github` Go symbols
+    "billomat__idpat",     // captured `bitfinex`/`github`
+    "textmagic__userpat",  // captured `Scanner`/`github`
+    "cashboard__userpat",  // captured `checklyhq`/`github`
+    "companyhub__idpat",   // captured `Scanner`/`Agithub`
+    "repairshopr__domainpat", // captured `.Scanner`/`Bgithub.com`
+    "salesmate__domainpat", // captured `Scanner`/`github`
+    // Round 12 (DB tools): artsy fired on Go symbols.
+    "artsy__keypat", // captured `outerBoundaryIsinnerBoundaryIsno` Go symbols
+    // Round 13 (APK/xpi/AppImage). Browser-extension filter lists are
+    // dense with domains + channel IDs.
+    "youtubeapikey__idpat", // captured YouTube channel IDs from ad-filter lists
+    "mixpanel__idpat",      // captured tracking domains from filter lists
+    "shutterstock__secretpat", // captured words like `fullfilmizlesene`
+    "airtableoauth__tokenpat", // captured version strings like `quasar.v1.4.1`
+    // Policy: bare-hostname domain/URL detectors capture identifiers, not
+    // secrets — pure noise for a scrubber. Credential-bearing connection
+    // strings (postgres://, mongodb://user:pass@, ldap://) stay active.
+    "auth0oauth__domainpat", // captures `cdn.auth0.com` — a hostname, not a secret
+    "hashicorpvaultauth__vaulturlpat", // captures `*.hashicorp.cloud` hostname
+    "okta__domainpat",       // captures `*.okta.com` tenant hostname
+    "zendeskapi__domain",    // captures `*.zendesk.com` subdomains from filter lists
+    // Round 14 (conda/firmware/ethereum): geth fired on TLD data.
+    "fastlypersonaltoken__keypat", // keyword `fastly` + 32 alnums — matches punycode TLD data
+    // Round 15 (composer/elixir/bitcoin/victoriametrics): composer doc string.
+    "atlassian_v1__keypat", // captured `oauth-on-bitbucket-cloud` doc string
 ];
 
 /// Rules that the structural heuristic ([`pattern_is_structurally_noisy`])
