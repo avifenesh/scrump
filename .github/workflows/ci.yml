@@ -115,7 +115,7 @@ jobs:
           # `scrump_rules` sweeps up bare-charclass sibling rules of
           # already-known-noisy providers; positive cases preserved, only
           # cross-provider FPs removed).
-          SCRUMP_TH_MAX_FAILURES: "156"
+          SCRUMP_TH_MAX_FAILURES: "130"
         run: cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
 
       - name: integration-test inventory

@@ -6,6 +6,39 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-05-20
+
+### Fixed
+
+- Real-artifact iteration rounds 11–15 (cloud/devops CLIs, database
+  engines, mobile/desktop app packages, scientific/firmware images, and
+  more language ecosystems): AWS CLI, minikube, argocd, gitleaks, the
+  TruffleHog binary, MongoDB/Redis/InfluxDB/ClickHouse/CockroachDB,
+  F-Droid/VLC APKs, uBlock Origin, KeePassXC, Miniconda, OpenWRT
+  firmware, geth, composer, elixir, bitcoin-core, VictoriaMetrics, jq.
+  Added 22 explicit quarantine entries; with the structural heuristic
+  the active auto-extracted ruleset is now ~905 rules (244 quarantined).
+  - New broken providers were almost all bare-character-class rules
+    firing on Go/AWS-SDK symbol tables (geocodio, maxmindlicense,
+    sugester, scalr, billomat, textmagic, artsy, customerguru, …) and
+    browser-extension filter lists (youtube channel IDs, tracking
+    domains).
+  - **Policy:** bare-hostname domain/URL detectors (`*.okta.com`,
+    `*.zendesk.com`, `cdn.auth0.com`, `*.hashicorp.cloud`) are now
+    quarantined — they capture identifiers, not secrets. Credential-
+    bearing connection strings (`postgres://`, `mongodb://user:pass@`,
+    `ldap://`) stay active.
+  - TruffleHog parity harness: 156 → 130 known cross-provider FPs.
+  - FP rate on representative real artifacts is at the floor: most Go
+    binaries, DB engines, firmware, ML installers, and language runtimes
+    scan at 0 hits; the few non-zero outliers are correct detections
+    (the `AKIAIOSFODNN7EXAMPLE` doc key in AWS CLI, embedded PEM test
+    keys, the dual-use cosmos base64 rule).
+- Per-round false-negative validation: marquee secrets planted *inside*
+  each round's tarballs (gitleaks, trufflehog, redis, influxdb, geth,
+  victoriametrics, bitcoin) and scrubbed — 0 leaks of 18 every time, on
+  top of the permanent `fn_marquee` engine-level guard.
+
 ## [0.1.6] — 2026-05-20
 
 ### Added
@@ -235,7 +268,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/avifenesh/scrump/releases/tag/v0.1.7
 [0.1.6]: https://github.com/avifenesh/scrump/releases/tag/v0.1.6
 [0.1.5]: https://github.com/avifenesh/scrump/releases/tag/v0.1.5
 [0.1.4]: https://github.com/avifenesh/scrump/releases/tag/v0.1.4
