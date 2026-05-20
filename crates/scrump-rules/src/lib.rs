@@ -61,12 +61,17 @@ pub const TH_QUARANTINE: &[&str] = &[
     "boxoauth__subjectidpat", // keyword `user|subject|id` + 6-20 digits — every numeric ID matches
     "browserstack__keypat",  // keyword `key` + 20 alnums — fires on every env var
     "browserstack__userpat", // keyword `user|username` + 9-29 alnums — fires on every env var
-    "circleci_v1__keypat",   // keyword `circle` + 40 hex — matches every git SHA-1 near the word
-    "clickhelp__emailpat",   // RFC-shaped email pattern, no provider context
-    "clickhelp__keypat",     // keyword `key|token|api|secret` + 24 alnums — every config value
-    "cloudflareglobalapikey__emailpat", // RFC-shaped email pattern, no provider context
-    "copper__idpat",         // `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b` email
+    "chatbot__keypat", // keyword `chatbot` + alnums — matches AWS SDK fn names like `DeleteMicrosoftTeamsUserIdentity`
+    "circleci_v1__keypat", // keyword `circle` + 40 hex — matches every git SHA-1 near the word
+    "clickhelp__emailpat", // RFC-shaped email pattern, no provider context
+    "clickhelp__keypat", // keyword `key|token|api|secret` + 24 alnums — every config value
+    "cloudflareapitoken__keypat", // keyword `cloudflare` + 40 alnums — matches package-name concatenations
+    "cloudflareglobalapikey__apikeypat", // keyword `cloudflare` + 37 alnums — matches package-name concatenations
+    "cloudflareglobalapikey__emailpat",  // RFC-shaped email pattern, no provider context
+    "copper__idpat", // `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b` email
     "currencycloud__emailpat", // RFC-shaped email pattern, no provider context
+    "customerguru__idpat", // keyword `customer|guru` + alnums — matches Go middleware fn names
+    "customerguru__keypat", // keyword `customer|guru` + alnums — matches Go type names
     "customerio__idpat", // keyword `customer` + 20 alnums — matches Go fn names like `SetChecksumAlgorithm`
     "customerio__keypat", // keyword `customer` + 20 alnums — same shape
     "datadogapikey__apikeypat", // keyword `dd` + 32 alnums — fires on Go fn names
@@ -80,6 +85,8 @@ pub const TH_QUARANTINE: &[&str] = &[
     "docusign__idpat",  // keyword `integration|id` + UUID
     "docusign__secretpat", // keyword `secret` + UUID — `secret` is generic in any Go binary
     "dotdigital__passpat", // keyword `pw|pass` fires on every config password line
+    "algoliaadminkey__keypat", // keyword `algolia` + alnums — matches Go middleware fn names
+    "azuresastoken__urlpat", // keyword `sas` + url — matches words like `storageaccount`
     "easyinsight__idpat", // keyword `id` + 20 alnums — every random env value
     "easyinsight__keypat", // keyword `key` + 20 alnums — every random env value
     "elasticemail__keypat", // keyword `elastic` + 96 destructive chars — matches Go TLD data tables
@@ -98,14 +105,27 @@ pub const TH_QUARANTINE: &[&str] = &[
     "github_oauth2__oauth2clientidpat", // keyword `github` + 20 alnums — matches GraphQL type names like `CheckConclusionState`
     "github_oauth2__oauth2clientsecretpat", // keyword `github` + 40 hex — matches every git SHA-1
     "githubapp__apppat",                // keyword `github` + 6 digits — matches any 6-digit run
-    "gitlaboauth2__clientidpat",        // keyword `id` + 64 hex
-    "graphcms__idpat",                  // keyword `graph` + 25 alnums — matches GraphQL identifiers
+    "gitlab_v1__keypat", // keyword `gitlab` + 20-22 chars — matches Jest matchers like `toHaveBeenCalledWith`
+    "gitlaboauth2__clientidpat", // keyword `id` + 64 hex
+    "grafanaserviceaccount__domainpat", // keyword `grafana` + domain — matches `drone.grafana.net`
+    "groovehq__keypat",  // keyword `groove` + alnums — matches concatenated words
+    "guru__unamepat",    // keyword `guru` + email pattern — matches `sass@replayio`
+    "intercom__keypat",  // keyword `intercom` + capture — matches surrounding prose
+    "jiratoken_v1__tokenpat", // keyword `jira` + alnums — matches Go type names like `FeaturedResultsSetStatus`
+    "liveagent__keypat",      // keyword `live` matches `liveagent`/`alive` + alnums (Go fn names)
+    "polygon__keypat", // keyword `polygon` matches geometry code like `TangentVisibilityGraphCalculator`
+    "redis__keypat",   // keyword `redis` + capture — matches the word `password`
+    "roaring__clientpat", // keyword `roaring` matches `orBitmap…` from the roaring bitmap library
+    "roaring__secretpat", // keyword `roaring` — duplicate shape
+    "zendeskapi__token", // keyword `zendesk` + alnums — matches Go SDK identifiers
+    "graphcms__idpat", // keyword `graph` + 25 alnums — matches GraphQL identifiers
     "hashicorpvaultauth__roleidpat", // keyword `role` + UUID — `role` matches every k8s/IAM role string
     "hashicorpvaultauth__secretidpat", // keyword `secret` + UUID — duplicate of docusign__secretpat
     "hive__idpat", // keyword `hive` + 17 alnums — matches code identifiers like `archiveItemConfig`
     "host__keypat", // keyword `host` + 14 lowercase alnum — matches `addressunknown`, etc.
     "ibmclouduserkey__keypat", // keyword `ibm` matches `IBM-`/`ebcdic` text in encoding tables
     "jdbc__pattern", // `(?i)pass.*?=(.+?)\b` matches any config `password=...` line
+    "jiratoken_v1__domainpat", // keyword `jira|atlassian` + dotted hostname — matches .NET namespaces like `Markdig.Extensions.NoRefLinks`
     "jiratoken_v2__domainpat", // `\b((?:[a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]{2,16})\b` matches every dotted hostname
     "jiratoken_v2__emailpat",  // RFC-shaped email pattern, no provider context
     "ldap__passwordpat",       // keyword `pass` + quoted 4-48 chars — every config `password='…'`
@@ -132,6 +152,8 @@ pub const TH_QUARANTINE: &[&str] = &[
     "onedesk__emailpat", // RFC-shaped email pattern, no provider context
     "onelogin__oauthclientidpat", // keyword `id` + 64 lowercase hex
     "onelogin__oauthclientsecretpat", // keyword `secret` + 64 hex — Go string concatenations
+    "linemessaging__keypat", // keyword `line` matches `inlayHint`/LSP method names + 171 chars
+    "openvpn__clientidpat", // keyword `openvpn` + 2 dotted segments — matches `u-boot-exception` etc.
     "openvpn__clientsecretpat", // `\b([a-zA-Z0-9_-]{64,})\b` unbounded — eats megabytes
     "paypaloauth__idpat", // `\b([A-Za-z0-9_\.]{7}-[A-Za-z0-9_\.]{72}|...)\b` — matches Go string concatenations
     "paypaloauth__keypat", // `\b([A-Za-z0-9_\.\-]{44,80})\b` no anchor; needs hand-coded rule in default.yaml
@@ -149,7 +171,8 @@ pub const TH_QUARANTINE: &[&str] = &[
     "signable__keywordpat", // `(?i)([a-z]{2})signable` matches `assignable`, captures only 2 chars
     "signable__tokenpat", // `.{0,2}signable` matches `assignable` followed by 32 alnums
     "snowflake__accountidentifierpat", // keyword `account` + 7-262 chars — matches arbitrary identifiers
-    "sourcegraph__keypat",             // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
+    "sirv__keypat", // keyword `sirv` + 88 chars — matches binary garbage in model files
+    "sourcegraph__keypat", // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
     "smartsheets__keypat", // keyword `sheet` matches `worksheet`/`spreadsheet` + 26-37 alnums — Go type names
     "sumologickey__keypat", // keyword `sumo|accessKey` + 64 alnums — `accessKey` too generic
     "swell__idpat",        // keyword `swell` matches `Wellknown`/`isWellFormed` + 6-24 alnums
@@ -161,6 +184,8 @@ pub const TH_QUARANTINE: &[&str] = &[
     "twitterconsumerkey__keypat", // keyword `consumer|key` + 25 alnums — matches Go fn names like `generateClientKeyExchange`
     "unifyid__keypat",            // keyword `unify` matches `unified`/`unifying` + 44 alnums
     "verifier__emailpat", // keyword `verifier` + RFC email pattern — fires on any @-shaped Go module path
+    "wit__keypat",        // keyword `wit` matches `width`/`switch`/`with` + 32 uppercase alnums
+    "wiz__idpat",         // keyword `wiz` matches `Wizard` + alnums — Go middleware fn names
     "wiz__secretpat",     // keyword `wiz` matches `Wizard`/`bewildering` + 64 alnums
     "trelloapikey__tokenpat", // `\b([a-zA-Z-0-9]{64})\b` no anchor
     "tru__keypat",        // keyword `tru` + UUID — same broken keyword as tru__secrepat
