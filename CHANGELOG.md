@@ -6,6 +6,35 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-05-20
+
+### Fixed
+
+- Real-artifact iteration rounds 16–20 — the final five of a 20-round
+  campaign — across game engines (Godot, Blender), .NET/NuGet, more
+  language runtimes (Nim, Crystal, Lua, the .NET SDK), and a wide span
+  of production Go binaries (syncthing, rclone, nats, vector, minio,
+  tailscale, Spark, Kafka, Elasticsearch, wasmtime, LLVM, gitlab-runner,
+  step-ca, packer, nomad, geth-class tools). Added 13 explicit
+  quarantine entries; with the structural heuristic the active
+  auto-extracted ruleset is now ~889 rules (260 quarantined).
+  - Every new broken provider was the same shape: a bare-character-class
+    rule firing on compiled-binary symbol tables (.NET method names like
+    `BuildArgumentsBaseOnEnumTypeName`, Go string concatenations).
+    pepipost, fixerio, karmacrm, typeform, cloudinary, imagekit,
+    apimatic, splunkobservability, rabbitmq, demio, sentrytoken,
+    accuweather, miro.
+  - Convergence is now clear: rounds 16 and several others surfaced zero
+    new providers; the residual hits on large binaries are the
+    deliberately-kept dual-use rules (`azure_cosmosdb__dbkeypattern`,
+    `okta__tokenpat`) plus genuine true positives (the
+    `AKIAIOSFODNN7EXAMPLE` / `ACCA…` AWS keys and embedded PEM private
+    keys that real artifacts legitimately contain).
+  - TruffleHog parity harness: 130 → 123 known cross-provider FPs.
+- Per-round false-negative validation continued: marquee secrets planted
+  inside each round's tarballs and scrubbed with 0 leaks of 18, on top
+  of the permanent `fn_marquee` and `structural_heuristic` guards.
+
 ## [0.1.7] — 2026-05-20
 
 ### Fixed
@@ -268,7 +297,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/avifenesh/scrump/releases/tag/v0.1.8
 [0.1.7]: https://github.com/avifenesh/scrump/releases/tag/v0.1.7
 [0.1.6]: https://github.com/avifenesh/scrump/releases/tag/v0.1.6
 [0.1.5]: https://github.com/avifenesh/scrump/releases/tag/v0.1.5
