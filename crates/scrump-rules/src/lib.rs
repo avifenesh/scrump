@@ -193,6 +193,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "twilio__keypat",     // `\b[0-9a-f]{32}\b` — matches every MD5 / 32-char hex
     "twilioapikey__secretpat", // `\b[0-9a-zA-Z]{32}\b` no anchor
     "user__keypat",       // keyword `user` + 64 chars — matches Google profile photo URL fragments
+    "user__userurlpat",   // bare `*.user.com` tenant hostnames are identifiers, not secrets
     "wepay__appidpat",    // `\b(\d{6})\b` — every six-digit number
     "zendeskapi__email",  // email pattern, no provider context
     "zipapi__emailpat",   // RFC-shaped email pattern, no provider context
