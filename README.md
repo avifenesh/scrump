@@ -112,17 +112,17 @@ live under `crates/scrump-{trufflehog,presidio}-compat/`.
 every `*_test.go` under TruffleHog's `pkg/detectors/`, parses each
 parametrized test, and runs scrump against the test input.
 
-**Last full run: 2,309 of 2,493 cases pass across 854 providers
-(92.6%).** The remaining 184 are negative-case false-positives where
+**Last full run: 2,069 of 2,192 cases pass across 743 providers
+(94.4%).** The remaining 123 are negative-case false-positives where
 provider A's no-hit-expected input still trips provider B's
 auto-extracted `PrefixRegex` (e.g. a `sugester` test input fires the
 `tableau` rule). They are over-detection in a scrubbing context —
 nothing TruffleHog catches is missed by scrump. CI gates on
-`SCRUMP_TH_MAX_FAILURES=184`; lowering this number must accompany rule
+`SCRUMP_TH_MAX_FAILURES=123`; lowering this number must accompany rule
 fixes, and any increase fails the build. After the #9 rule curation,
-82 structurally-broken patterns are dropped at load time (see
+260+ structurally-broken patterns are dropped at load time (see
 `TH_QUARANTINE` in `scrump-rules`) — this is what drove the harness
-from 201 failures down to 184 and the per-MB hit rate on real SQLite
+from 201 failures down to 123 and the per-MB hit rate on real SQLite
 log artifacts from ~85,000 to under 0.5.
 
 ### Microsoft Presidio (PII) cross-format
@@ -158,7 +158,7 @@ If you have [`just`](https://github.com/casey/just) installed:
 ```sh
 just check                  # fmt + clippy + tests + docs
 just e2e                    # all 8 phase-gate scripts
-just compat-trufflehog      # 864-provider parity (clones vendor/trufflehog on first run)
+just compat-trufflehog      # upstream TruffleHog parity (clones vendor/trufflehog on first run)
 just compat-presidio        # 52 recognizers × 8 formats
 just deny                   # cargo-deny supply-chain audit
 just ci                     # everything CI runs, in order
@@ -205,7 +205,7 @@ scrump/
 │   ├── scrump-format-jfr/          # Java Flight Recorder
 │   ├── scrump-format-pcap/         # pcap / pcapng
 │   ├── scrump-test-fixtures/       # spec-compliant generators
-│   ├── scrump-trufflehog-compat/   # 864-provider parity harness
+│   ├── scrump-trufflehog-compat/   # TruffleHog parity harness
 │   └── scrump-presidio-compat/     # 8-format × 52-recognizer harness
 ├── tests/                          # phase 0..7 e2e gates
 └── docs/                           # architecture, threat model
