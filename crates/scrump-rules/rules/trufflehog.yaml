@@ -230,7 +230,7 @@ rules:
   pattern: (?i:atera)(?:.|[\n\r]){0,40}?\b([0-9a-z]{32})\b
   capture_index: 1
 - id: atlassian_v1__keypat
-  pattern: (?i:atlassian)(?:.|[\n\r]){0,40}?\b([a-zA-Z-0-9]{24})\b
+  pattern: (?i:atlassian)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{24})\b
   capture_index: 1
 - id: atlassian_v2__keypat
   pattern: \b(ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b
@@ -1654,7 +1654,7 @@ rules:
   pattern: (?i:kickbox)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9_]+[a-zA-Z0-9]{64})\b
   capture_index: 1
 - id: klaviyo__keypat
-  pattern: \b(pk_[[:alnum:]]{34})\b
+  pattern: \b(pk_([0-9a-f]{34}|[A-Za-z0-9]{6}_[0-9a-f]{34}))\b
   capture_index: 1
 - id: klipfolio__keypat
   pattern: (?i:klipfolio)(?:.|[\n\r]){0,40}?\b([0-9a-f]{40})\b
@@ -2421,6 +2421,9 @@ rules:
 - id: rebrandly__keypat
   pattern: (?i:rebrandly)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9_]{32})\b
   capture_index: 1
+- id: redhatpyxis__pyxisapikeypat
+  pattern: (?i:redhat|pyxis)(?:.|[\n\r]){0,40}?\b([a-z0-9]{32})\b
+  capture_index: 1
 - id: redis__keypat
   pattern: \bredi[s]{1,2}://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b
   capture_index: 1
@@ -3178,7 +3181,10 @@ rules:
   pattern: (?i:urlscan)(?:.|[\n\r]){0,40}?\b([a-z0-9-]{36})\b
   capture_index: 1
 - id: user__keypat
-  pattern: (?i:user)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9-._+=]{64})\b
+  pattern: (?i:user)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9]{64})\b
+  capture_index: 1
+- id: user__userurlpat
+  pattern: \b([a-z0-9-]+\.user\.com)\b
   capture_index: 1
 - id: userflow__keypat
   pattern: (?i:userflow)(?:.|[\n\r]){0,40}?\b([0-9a-z_]{29})\b

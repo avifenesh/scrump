@@ -6,6 +6,13 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Refreshed the auto-extracted TruffleHog mirror against current upstream
+  and quarantined the new bare `*.user.com` hostname detector
+  (`user__userurlpat`), restoring the compatibility harness to the
+  existing 123 known cross-provider false-positive floor.
+
 ## [0.1.8] — 2026-05-20
 
 ### Fixed

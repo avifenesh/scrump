@@ -37,7 +37,7 @@ compat-trufflehog:
         cd vendor/trufflehog && git sparse-checkout set pkg/detectors pkg/common ; \
     fi
     cargo run --release -p scrump-trufflehog-compat --bin th-extract
-    SCRUMP_TH_MAX_FAILURES=201 cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
+    SCRUMP_TH_MAX_FAILURES=123 cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
 
 # Presidio PII × every binary format we support.
 compat-presidio:
