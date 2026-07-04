@@ -82,10 +82,10 @@ jobs:
         run: bash tests/e2e_phase7.sh
 
   # ------------------------------------------------------------------
-  # 3. TruffleHog compatibility — 864 providers × pattern corpus
+  # 3. TruffleHog compatibility — upstream provider corpus
   # ------------------------------------------------------------------
   compat-trufflehog:
-    name: trufflehog compat (864 providers)
+    name: trufflehog compat
     runs-on: ubuntu-latest
     needs: check
     steps:
@@ -104,17 +104,16 @@ jobs:
 
       - name: run compat harness
         env:
-          # 156 known cross-provider false-positives (a negative-case input
-          # for provider A trips provider B's auto-extracted PrefixRegex).
-          # These are not missed detections — the redaction path is sound.
-          # See main.rs for rationale; lowering this should accompany rule
-          # fixes, never raising it.
+          # Known cross-provider false-positives (a negative-case input for
+          # provider A trips provider B's auto-extracted PrefixRegex). These
+          # are not missed detections — the redaction path is sound. See
+          # main.rs for rationale; lowering this should accompany rule fixes,
+          # never raising it.
           #
           # Baseline after #9 rule curation: 201 → 184 (explicit
           # TH_QUARANTINE list, 170 rules) → 156 (structural heuristic in
           # `scrump_rules` sweeps up bare-charclass sibling rules of
-          # already-known-noisy providers; positive cases preserved, only
-          # cross-provider FPs removed).
+          # already-known-noisy providers) → 123 (real-artifact rounds 11–20).
           SCRUMP_TH_MAX_FAILURES: "123"
         run: cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
 
