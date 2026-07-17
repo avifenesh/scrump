@@ -367,9 +367,20 @@ rules:
 - id: azuresastoken__urlpat
   pattern: https://([a-zA-Z0-9][a-z0-9_-]{1,22}[a-zA-Z0-9])\.blob\.core\.windows\.net/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:/[a-zA-Z0-9._-]+)*
   capture_index: 1
-- id: azuresastoken__keypat
-  pattern: (?i:azure|sas|token|blob|.blob.core.windows.net)(?:.|[\n\r]){0,40}?(sp=[racwdli]+&st=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&se=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:&sip=\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3})?)?(&spr=https)?(?:,https)?&sv=\d{4}-\d{2}-\d{2}&sr=[bcfso]&sig=[a-zA-Z0-9%]{10,})
-  capture_index: 1
+- id: azuresastoken__sasquerypat
+  pattern: '[a-z]{2,4}=[^&=\s"''<>]+(?:&[a-z]{2,4}=[^&=\s"''<>]+)+'
+- id: azuresastoken__spvaluepat
+  pattern: ^[racwdli]+$
+- id: azuresastoken__svvaluepat
+  pattern: ^\d{4}-\d{2}-\d{2}$
+- id: azuresastoken__srvaluepat
+  pattern: ^[bcfso]$
+- id: azuresastoken__timevaluepat
+  pattern: ^\d{4}-\d{2}-\d{2}T\d{2}(?::|%3[Aa])\d{2}(?::|%3[Aa])\d{2}Z$
+- id: azuresastoken__sigvaluepat
+  pattern: ^[a-zA-Z0-9%+/=]{10,}$
+- id: azuresastoken__sipvaluepat
+  pattern: ^\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3})?$
 - id: azuresearchadminkey__keypat
   pattern: (?i:azure)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z]{52})\b
   capture_index: 1
@@ -679,16 +690,28 @@ rules:
 - id: cloudelements__orgpat
   pattern: (?i:cloudelements)(?:.|[\n\r]){0,40}?\b([a-z0-9]{32})\b
   capture_index: 1
-- id: cloudflareapitoken__keypat
+- id: cloudflareapitoken_v1__keypat
   pattern: (?i:cloudflare)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9_-]{40})\b
+  capture_index: 1
+- id: cloudflareapitoken_v2__keypat
+  pattern: \b(cf[ua]t_[a-zA-Z0-9]{40}[a-f0-9]{8})\b
+  capture_index: 1
+- id: cloudflareapitoken_v2__accountidpat
+  pattern: \b([a-f0-9]{32})\b
   capture_index: 1
 - id: cloudflarecakey__keypat
   pattern: \b(v1\.0-[A-Za-z0-9-]{171})\b
   capture_index: 1
-- id: cloudflareglobalapikey__apikeypat
-  pattern: (?i:cloudflare)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9_-]{37})\b
+- id: cloudflareglobalapikey_v1__apikeypat
+  pattern: (?i:cloudflare)(?:.|[\n\r]){0,40}?\b([a-f0-9]{37,45})\b
   capture_index: 1
-- id: cloudflareglobalapikey__emailpat
+- id: cloudflareglobalapikey_v1__emailpat
+  pattern: \b((?i)(?:[a-z0-9!#$%&'*+/=?^_\x60{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_\x60{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\]))\b
+  capture_index: 1
+- id: cloudflareglobalapikey_v2__apikeypat
+  pattern: \b(cfk_[a-zA-Z0-9]{40}[a-f0-9]{8})\b
+  capture_index: 1
+- id: cloudflareglobalapikey_v2__emailpat
   pattern: \b((?i)(?:[a-z0-9!#$%&'*+/=?^_\x60{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_\x60{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\]))\b
   capture_index: 1
 - id: cloudimage__keypat
@@ -1008,6 +1031,15 @@ rules:
   capture_index: 1
 - id: dropbox__keypat
   pattern: (?i:dropbox)(?:.|[\n\r]){0,40}?\b(sl\.(u\.)?[A-Za-z0-9\-\_]{130,})\b
+  capture_index: 1
+- id: duo__integrationkeypat
+  pattern: (?i:duo)(?:.|[\n\r]){0,40}?\b(DI[A-Z0-9]{18})\b
+  capture_index: 1
+- id: duo__secretkeypat
+  pattern: (?i:duo)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9]{40})\b
+  capture_index: 1
+- id: duo__apihost
+  pattern: \b([a-z0-9-]{6,}\.duosecurity\.com)\b
   capture_index: 1
 - id: duply__keypat
   pattern: (?i:duply)(?:.|[\n\r]){0,40}?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b
@@ -1435,6 +1467,12 @@ rules:
 - id: harvest__idpat
   pattern: (?i:harvest)(?:.|[\n\r]){0,40}?\b([0-9]{4,9})\b
   capture_index: 1
+- id: hashicorpvault_hashicorpvaultbatchtoken__vaulturlpat
+  pattern: (https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?
+  capture_index: 1
+- id: hashicorpvault_hashicorpvaulttoken__vaulturlpat
+  pattern: (https?:\/\/[^\s\/]*\.hashicorp\.cloud(?::\d+)?)(?:\/[^\s]*)?
+  capture_index: 1
 - id: hashicorpvaultauth__roleidpat
   pattern: (?i:role)(?:.|[\n\r]){0,40}?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b
   capture_index: 1
@@ -1758,7 +1796,7 @@ rules:
   pattern: (?i:loadmill)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z]{40})\b
   capture_index: 1
 - id: lob__keypat
-  pattern: (?i:lob)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9_]{40})\b
+  pattern: \b((live|test)_[a-zA-Z0-9_]{35})\b
   capture_index: 1
 - id: locationiq__keypat
   pattern: \b(pk\.[a-zA-Z-0-9]{32})\b
@@ -2001,6 +2039,9 @@ rules:
 - id: neutrinoapi__idpat
   pattern: (?i:neutrinoapi)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{6,24})\b
   capture_index: 1
+- id: newrelicinsightsinsertkey__keypat
+  pattern: \b(NRII-[a-zA-Z0-9-_]{25})
+  capture_index: 1
 - id: newrelicpersonalapikey__keypat
   pattern: (?i:newrelic)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9_\.]{4}-[A-Za-z0-9_\.]{42})\b
   capture_index: 1
@@ -2073,6 +2114,9 @@ rules:
 - id: oanda__keypat
   pattern: (?i:oanda)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{24})\b
   capture_index: 1
+- id: octopusdeploy__urlpat
+  pattern: \b([a-z0-9-]+\.octopus\.app)\b
+  capture_index: 1
 - id: okta__domainpat
   pattern: \b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b
 - id: okta__tokenpat
@@ -2115,6 +2159,9 @@ rules:
   capture_index: 1
 - id: opencagedata__keypat
   pattern: (?i:opencagedata)(?:.|[\n\r]){0,40}?\b([a-z0-9]{32})\b
+  capture_index: 1
+- id: openrouter__keypat
+  pattern: \b(sk-or-v1-[0-9a-f]{64})\b
   capture_index: 1
 - id: openuv__keypat
   pattern: (?i:openuv)(?:.|[\n\r]){0,40}?\b([0-9a-z]{32})\b

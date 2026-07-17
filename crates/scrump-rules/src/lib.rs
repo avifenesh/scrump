@@ -250,6 +250,34 @@ pub const TH_QUARANTINE: &[&str] = &[
     "sentrytoken_v1__keypat", // Go symbols in gitlab-runner
     "accuweather_v1__keypat", // captured `ridgewaterBrightscope…` Go concat
     "miro__keypat",           // captured `cubesilverfishvindicator…` Go concat
+    // Round 21 (upstream corpus refresh, 2026-07): TruffleHog renamed
+    // `cloudflareglobalapikey` → `_v1`/`_v2` and `hashicorpvaultauth` →
+    // `hashicorpvault_hashicorpvault{,batch}token`, orphaning the entries
+    // above (kept for older corpora); new `duo` provider added. Same
+    // noise classes as their predecessors.
+    "cloudflareapitoken_v2__accountidpat", // `\b([a-f0-9]{32})\b` no anchor — matches every MD5/UUID hex (1,505 hits on the noise corpus)
+    "cloudflareglobalapikey_v1__apikeypat", // keyword `cloudflare` + 37-45 hex — renamed cloudflareglobalapikey__apikeypat
+    "cloudflareglobalapikey_v1__emailpat",  // RFC-shaped email pattern, no provider context
+    "cloudflareglobalapikey_v2__emailpat",  // RFC-shaped email pattern, no provider context
+    "duo__apihost", // bare `*.duosecurity.com` hostnames are identifiers, not secrets
+    "duo__secretkeypat", // keyword `duo` + bare 40 alnums — matches every SHA-1-shaped hex/word near `duo`
+    "hashicorpvault_hashicorpvaultbatchtoken__vaulturlpat", // bare `*.hashicorp.cloud` URL — renamed hashicorpvaultauth__vaulturlpat
+    "hashicorpvault_hashicorpvaulttoken__vaulturlpat", // bare `*.hashicorp.cloud` URL — same rename
+    // Round 21 continued: remaining bare-hostname/URL detectors surfaced by
+    // the corpus refresh — same identifiers-not-secrets policy as the
+    // auth0oauth__domainpat block above.
+    "azure_cosmosdb__accounturlpattern", // bare `*.documents.azure.com` account hostname
+    "azureapimanagement_repositorykey__urlpat", // keyword `azure|url` + `*.scm.azure-api.net` hostname
+    "hasura__domainpat",                        // bare `*.hasura.app` tenant hostname
+    "invoiceocean__urlpat",                     // bare `*.invoiceocean.com` tenant hostname
+    "kanban__urlpat",                           // bare `*.kanbantool.com` tenant hostname
+    "octopusdeploy__urlpat",                    // bare `*.octopus.app` tenant hostname
+    "salesforceoauth2__instancepat",            // bare `*.my.salesforce.com` instance hostname
+    "shopify__domainpat",                       // bare `*.myshopify.com` shop hostname
+    "shopifyoauth__domainpat", // bare `*.myshopify.com` shop hostname (duplicate shape)
+    "tableau__tableauurlpat",  // bare `*.online.tableau.com` site hostname
+    "trufflehogenterprise__hostnamepat", // bare `*.trufflehog.org` hostname
+    "zulipchat__domainpat",    // bare `*.zulipchat.com` realm hostname
 ];
 
 /// Rules that the structural heuristic ([`pattern_is_structurally_noisy`])
