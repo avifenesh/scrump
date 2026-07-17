@@ -113,8 +113,14 @@ jobs:
           # Baseline after #9 rule curation: 201 → 184 (explicit
           # TH_QUARANTINE list, 170 rules) → 156 (structural heuristic in
           # `scrump_rules` sweeps up bare-charclass sibling rules of
-          # already-known-noisy providers) → 123 (real-artifact rounds 11–20).
-          SCRUMP_TH_MAX_FAILURES: "123"
+          # already-known-noisy providers) → 123 (real-artifact rounds 11–20)
+          # → 99 (round 21: upstream corpus refresh 2026-07 — re-quarantined
+          # renamed cloudflare/hashicorpvault ids, new duo provider, the
+          # unanchored cloudflareapitoken_v2 account-id hex rule, and the
+          # remaining bare-hostname/URL detectors under the
+          # identifiers-not-secrets policy; ldap__uripat stays active since
+          # ldap:// URIs can embed bind credentials).
+          SCRUMP_TH_MAX_FAILURES: "99"
         run: cargo run --release -p scrump-trufflehog-compat --bin trufflehog-compat
 
       - name: integration-test inventory

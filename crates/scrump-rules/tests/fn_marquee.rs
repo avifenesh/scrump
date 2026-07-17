@@ -62,6 +62,9 @@ fn marquee_secrets() -> Vec<(&'static str, String)> {
             format!("github_pat_{}", fill(6, 82)),
         ),
         ("huggingface_user_token", format!("hf_{}", fill(7, 34))),
+        // 23-char suffix: longer than gitlab_v2__keypat's 20..22 cap, so
+        // only the curated gitlab_pat rule catches it (issue #10 probe).
+        ("gitlab_pat", format!("glpat-_{}", fill(23, 22))),
         (
             "openai_classic_key",
             format!("sk-{}T3BlbkFJ{}", fill(8, 8), fill(9, 24)),

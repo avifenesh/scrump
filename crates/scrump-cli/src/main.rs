@@ -33,6 +33,10 @@ enum Cmd {
         /// real tokens or false positives — see issue #9.
         #[arg(long, value_name = "N")]
         samples: Option<usize>,
+        /// How many rules the trailing rule-frequency summary lists
+        /// (default 10). Pass a number or `all` — see issue #11.
+        #[arg(long, value_name = "N|all")]
+        summary: Option<String>,
     },
     /// Redact a file in place (or to -o).
     Scrub {
@@ -81,8 +85,20 @@ fn main() -> Result<()> {
     let dispatcher = build_dispatcher();
 
     match cli.cmd {
-        Cmd::Scan { path, samples } => {
-            scan(&path, &dispatcher, cli.format.as_deref(), &engine, samples)
+        Cmd::Scan {
+            path,
+            samples,
+            summary,
+        } => {
+            let summary = parse_summary(summary.as_deref())?;
+            scan(
+                &path,
+                &dispatcher,
+                cli.format.as_deref(),
+                &engine,
+                samples,
+                summary,
+            )
         }
         Cmd::Scrub { path, out, backup } => scrub(
             &path,
@@ -106,18 +122,34 @@ fn open(d: &Dispatcher, path: &Path, force: Option<&str>) -> Result<Box<dyn Form
     }
 }
 
+/// `--summary` argument: `all` → no cap, a number → top-N. `None` (flag
+/// absent) keeps the default top-10 trailing block.
+fn parse_summary(arg: Option<&str>) -> Result<usize> {
+    const DEFAULT_TOP: usize = 10;
+    match arg {
+        None => Ok(DEFAULT_TOP),
+        Some("all") => Ok(usize::MAX),
+        Some(n) => n
+            .parse()
+            .with_context(|| format!("--summary expects a number or `all`, got `{n}`")),
+    }
+}
+
 fn scan(
     path: &Path,
     d: &Dispatcher,
     force: Option<&str>,
     eng: &Engine,
     samples: Option<usize>,
+    summary_top: usize,
 ) -> Result<()> {
     let fmt = open(d, path, force)?;
     println!("(format={})", fmt.name());
     let mut hit_count = 0usize;
     let cap = samples.unwrap_or(0);
     let mut per_rule_samples: std::collections::BTreeMap<String, (usize, Vec<Vec<u8>>)> =
+        std::collections::BTreeMap::new();
+    let mut rule_counts: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     for chunk in fmt.chunks() {
         for h in eng.scan_chunk(&chunk) {
@@ -130,6 +162,7 @@ fn scan(
                 h.rule_id,
                 h.origin
             );
+            *rule_counts.entry(h.rule_id.clone()).or_insert(0) += 1;
             if cap > 0 {
                 let entry = per_rule_samples
                     .entry(h.rule_id.clone())
@@ -149,6 +182,7 @@ fn scan(
         println!("clean: {} (0 hits)", path.display());
     } else {
         println!("found: {hit_count} hit(s) in {}", path.display());
+        print_rule_summary(&rule_counts, summary_top);
     }
     if cap > 0 && !per_rule_samples.is_empty() {
         println!("\n---- per-rule samples (up to {cap}) ----");
@@ -162,6 +196,46 @@ fn scan(
         }
     }
     Ok(())
+}
+
+/// Trailing rule-frequency block so an operator can tell at a glance
+/// whether a large scan is signal or one noisy rule (issue #11).
+fn print_rule_summary(rule_counts: &std::collections::BTreeMap<String, usize>, top: usize) {
+    if rule_counts.len() < 2 && top != usize::MAX {
+        return; // single rule: the found: line already says everything
+    }
+    let mut by_count: Vec<_> = rule_counts.iter().collect();
+    by_count.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+    let width = by_count
+        .iter()
+        .take(top)
+        .map(|(_, n)| group_thousands(**n).len())
+        .max()
+        .unwrap_or(0);
+    println!("top rules:");
+    for (rule, count) in by_count.iter().take(top) {
+        println!("  {:>width$}  {rule}", group_thousands(**count));
+    }
+    let hidden = by_count.len().saturating_sub(top);
+    if hidden > 0 {
+        println!(
+            "  {:>width$}  ({hidden} more rules, --summary=all to expand)",
+            "..."
+        );
+    }
+}
+
+/// `159364` → `159,364`.
+fn group_thousands(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
 }
 
 /// Render a matched-byte slice for human inspection: printable bytes
