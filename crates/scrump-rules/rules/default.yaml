@@ -27,6 +27,14 @@ rules:
   - id: github_fine_grained_pat
     pattern: 'github_pat_[A-Za-z0-9_]{82,255}'
 
+  # ---- GitLab -------------------------------------------------------------
+  # Literal `glpat-` prefix + 20..300 base64ish suffix chars. The
+  # auto-extracted gitlab_v2__keypat caps the suffix at 22 chars, so newer
+  # 23+-char tokens (and the routable `glpat-…` format) slip through its
+  # trailing \b (issue #10). This curated rule covers the full length range.
+  - id: gitlab_pat
+    pattern: 'glpat-[A-Za-z0-9_=-]{20,300}'
+
   # ---- HuggingFace --------------------------------------------------------
   # TruffleHog: \b(?:hf_|api_org_)[a-zA-Z0-9]{34}\b — exactly 34 chars.
   - id: huggingface_user_token
