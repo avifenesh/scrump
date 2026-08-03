@@ -45,7 +45,7 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 linux-perf-data = "0.13"
 object = { version = "0.36", default-features = false, features = ["std", "read_core", "elf"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
-base64 = "0.22"
+base64 = "0.23"
 
 [workspace.lints.clippy]
 # Curated set: high-signal lints we enforce across the workspace. Adding
