@@ -80,6 +80,13 @@ rules:
   - id: slack_workspace_refresh_token
     pattern: 'xoxr-[0-9]{10,13}-[0-9]{10,13}[A-Za-z0-9-]*'
 
+  # ---- Microsoft Teams ----------------------------------------------------
+  # Power Automate webhook v2 URLs are credentials only when the query has a
+  # non-empty `sig` signing key. Match `sig` in any query position, mirroring
+  # TruffleHog's post-pattern filter without accepting unsigned webhook URLs.
+  - id: microsoft_teams_webhook_v2
+    pattern: 'https://[a-z0-9]+\.[0-9]+\.environment\.api\.powerplatform\.com(?::[0-9]+)?/powerautomate/automations/direct/workflows/[a-f0-9]{32}/triggers/manual/paths/invoke\?(?:[^\s"''<>]*&)?sig=[A-Za-z0-9_-]+(?:&[^\s"''<>]*)?'
+
   # ---- ML / inference -----------------------------------------------------
   # TruffleHog nvapi pattern: \b(nvapi-[a-zA-Z0-9_-]{64})\b
   - id: nvidia_ngc_api_key

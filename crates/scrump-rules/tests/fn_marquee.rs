@@ -106,6 +106,15 @@ fn marquee_secrets() -> Vec<(&'static str, String)> {
             format!("xoxb-1234567890-1234567890-{}", fill(16, 24)),
         ),
         ("slack_app_token", format!("xapp-{}", fill(17, 24))),
+        (
+            "microsoft_teams_webhook_v2",
+            format!(
+                "https://default{}.62.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/{}/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig={}",
+                hexfill(24, 28),
+                hexfill(25, 32),
+                fill(26, 43),
+            ),
+        ),
         ("nvidia_ngc_api_key", format!("nvapi-{}", fill(18, 64))),
         (
             "wandb_api_key_prefixed",
@@ -115,6 +124,51 @@ fn marquee_secrets() -> Vec<(&'static str, String)> {
         ("stripe_test_secret", format!("sk_test_{}", fill(21, 24))),
         ("jwt_token", format!("{jwt_hdr}.{jwt_pl}.{}", fill(22, 43))),
     ]
+}
+
+#[test]
+fn microsoft_teams_webhook_requires_signature_in_any_query_position() {
+    let base = format!(
+        "https://default{}.62.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/{}/triggers/manual/paths/invoke",
+        hexfill(27, 28),
+        hexfill(28, 32),
+    );
+    let sig = fill(29, 43);
+    let signed_last =
+        format!("{base}?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig={sig}");
+    let signed_first =
+        format!("{base}?sig={sig}&api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0");
+    let unsigned = format!("{base}?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0");
+
+    let detectors = default_detectors().expect("default rules must compile");
+    let engine = Engine::new(detectors);
+    for candidate in [&signed_last, &signed_first] {
+        let chunk = Chunk {
+            bytes: candidate.as_bytes(),
+            offset: 0,
+            origin: ChunkOrigin::Raw,
+        };
+        let hits = engine.scan_chunk(&chunk);
+        assert!(
+            hits.iter().any(
+                |hit| hit.rule_id == "microsoft_teams_webhook_v2" && hit.len == candidate.len()
+            ),
+            "expected signed Teams webhook to be detected: {candidate}"
+        );
+    }
+
+    let chunk = Chunk {
+        bytes: unsigned.as_bytes(),
+        offset: 0,
+        origin: ChunkOrigin::Raw,
+    };
+    assert!(
+        engine
+            .scan_chunk(&chunk)
+            .iter()
+            .all(|hit| hit.rule_id != "microsoft_teams_webhook_v2"),
+        "unsigned Teams webhook must not be treated as a credential"
+    );
 }
 
 #[test]
