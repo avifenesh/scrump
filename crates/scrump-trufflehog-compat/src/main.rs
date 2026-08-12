@@ -857,6 +857,10 @@ const RULE_OVERRIDES: &[(&str, &[&str])] = &[
     // The auto-extracted `jwt__keypat` is stripped at load time in favour
     // of `JwtHsAware`, which uses the rule id `jwt_token`.
     ("jwt", &["jwt_token"]),
+    // TruffleHog accepts the broad URL match only when a separate pattern
+    // finds a non-empty `sig` query value. The curated rule preserves that
+    // post-filter while allowing query-parameter reordering.
+    ("microsoftteamswebhook_v2", &["microsoft_teams_webhook_v2"]),
 ];
 
 fn main() -> std::io::Result<()> {
