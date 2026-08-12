@@ -278,6 +278,12 @@ pub const TH_QUARANTINE: &[&str] = &[
     "tableau__tableauurlpat",  // bare `*.online.tableau.com` site hostname
     "trufflehogenterprise__hostnamepat", // bare `*.trufflehog.org` hostname
     "zulipchat__domainpat",    // bare `*.zulipchat.com` realm hostname
+    // Round 22 (upstream corpus refresh, 2026-08): invalid provider
+    // examples newly exercised two identifier-only patterns.
+    // Broad URL extraction lacks the upstream `sig` post-filter;
+    // default.yaml has a curated replacement.
+    "microsoftteamswebhook_v2__urlpat",
+    "newrelicinsightsquerykey__accountidpat", // bare New Relic account id, not a credential
 ];
 
 /// Rules that the structural heuristic ([`pattern_is_structurally_noisy`])
