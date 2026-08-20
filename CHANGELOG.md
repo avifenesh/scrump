@@ -6,6 +6,14 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `scrump scan --fail-on-hit`: exit with status **3** when the scan finds
+  at least one hit, so pre-commit hooks and CI gates can block on findings.
+  The code is deliberately distinct from 1 (runtime error) and 2 (CLI usage
+  error) — a scripted caller can tell "dirty file" from "scanner broke".
+  Covered by the phase-0 e2e gate (dirty file exits 3, clean file exits 0).
+
 ### Fixed
 
 - Refreshed the auto-extracted TruffleHog mirror against current upstream
