@@ -54,6 +54,18 @@ for r in "${EXPECTED_RULES[@]}"; do
   fi
 done
 
+echo "==> scrump scan --fail-on-hit (dirty file must exit 3)"
+rc=0
+"$BIN" scan --fail-on-hit "$TMP/planted.txt" >/dev/null || rc=$?
+if [[ "$rc" != 3 ]]; then
+  echo "FAIL: scan --fail-on-hit on a dirty file exited $rc, expected 3"
+  exit 1
+fi
+
+echo "==> scrump scan --fail-on-hit (clean file must exit 0)"
+printf 'the quick brown fox jumps over the lazy dog\n' > "$TMP/clean.txt"
+"$BIN" scan --fail-on-hit "$TMP/clean.txt" >/dev/null
+
 echo "==> scrump scrub"
 "$BIN" scrub "$TMP/planted.txt"
 

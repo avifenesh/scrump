@@ -37,6 +37,12 @@ enum Cmd {
         /// (default 10). Pass a number or `all` — see issue #11.
         #[arg(long, value_name = "N|all")]
         summary: Option<String>,
+        /// Exit with status 3 when the scan finds any hit, so scripted
+        /// callers (pre-commit hooks, CI gates) can block on findings.
+        /// Distinct from 1 (runtime error) and 2 (usage error): a caller
+        /// can tell "dirty file" from "scanner broke".
+        #[arg(long)]
+        fail_on_hit: bool,
     },
     /// Redact a file in place (or to -o).
     Scrub {
@@ -65,6 +71,10 @@ fn build_dispatcher() -> Dispatcher {
     d
 }
 
+/// Exit status for `scan --fail-on-hit` when at least one hit is found.
+/// Deliberately not 1 (anyhow runtime errors) or 2 (clap usage errors).
+const EXIT_HITS_FOUND: i32 = 3;
+
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -89,16 +99,21 @@ fn main() -> Result<()> {
             path,
             samples,
             summary,
+            fail_on_hit,
         } => {
             let summary = parse_summary(summary.as_deref())?;
-            scan(
+            let hits = scan(
                 &path,
                 &dispatcher,
                 cli.format.as_deref(),
                 &engine,
                 samples,
                 summary,
-            )
+            )?;
+            if fail_on_hit && hits > 0 {
+                std::process::exit(EXIT_HITS_FOUND);
+            }
+            Ok(())
         }
         Cmd::Scrub { path, out, backup } => scrub(
             &path,
@@ -135,6 +150,8 @@ fn parse_summary(arg: Option<&str>) -> Result<usize> {
     }
 }
 
+/// Scan `path` and report findings. Returns the number of hits so the
+/// caller can turn them into an exit status (`--fail-on-hit`).
 fn scan(
     path: &Path,
     d: &Dispatcher,
@@ -142,7 +159,7 @@ fn scan(
     eng: &Engine,
     samples: Option<usize>,
     summary_top: usize,
-) -> Result<()> {
+) -> Result<usize> {
     let fmt = open(d, path, force)?;
     println!("(format={})", fmt.name());
     let mut hit_count = 0usize;
@@ -195,7 +212,7 @@ fn scan(
             }
         }
     }
-    Ok(())
+    Ok(hit_count)
 }
 
 /// Trailing rule-frequency block so an operator can tell at a glance

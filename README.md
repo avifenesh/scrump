@@ -57,6 +57,9 @@ Supported targets out of the box:
 
 ```sh
 scrump scan some-file              # dry-run: report findings, never mutate
+scrump scan some-file --fail-on-hit    # exit 3 when hits are found — for
+                                       # pre-commit hooks and CI gates
+                                       # (1 = runtime error, 2 = usage error)
 scrump scrub some-file             # redact in place (atomic tmp+rename)
 scrump scrub some-file -o clean    # write clean copy elsewhere
 scrump scrub some-file --backup    # also keep the original at *.orig
