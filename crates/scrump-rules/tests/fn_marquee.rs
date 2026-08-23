@@ -172,6 +172,71 @@ fn microsoft_teams_webhook_requires_signature_in_any_query_position() {
 }
 
 #[test]
+fn harvest_token_detected_but_account_id_is_not() {
+    // `harvest__idpat` (keyword `harvest` + a bare 4-9 digit integer) was quarantined on
+    // 2026-08-23 because it is Harvest's ACCOUNT id, not a credential, and it fired 450 times
+    // across 421 files of a real prose repo — dates inside branch names, upstream issue numbers,
+    // tensor dims. Both halves of that decision are asserted here, because each without the
+    // other is a defect: dropping the id rule is only correct if the TOKEN rule still fires, and
+    // keeping the token rule is only useful if the id rule has actually stopped.
+    //
+    // The token is assembled at runtime (same reason as `marquee_secrets`): this source file must
+    // not itself carry a token-shaped literal.
+    let token = fill(31, 97);
+    assert_eq!(token.len(), 97, "harvest__keypat wants exactly 97 chars");
+
+    // Verbatim shapes from the repo that surfaced this, both of which used to block a commit.
+    let prose = "**B0 done (memra lane/dspark-harvest-fix-20260820 @ 77ffb69a37)**: flag-gated \
+                 shifted-label harvest, oracle emits DSPARK-strategy reference by default\n\
+                 DISPATCHED: box6 -> H4 confidence-window verify prototype (stacked on the \
+                 harvest fix; sglang v0.5.16 planner + vLLM #47808 as references)\n";
+    let credential = format!("HARVEST_ACCESS_TOKEN={token}\n");
+
+    let detectors = default_detectors().expect("default rules must compile");
+    let engine = Engine::new(detectors);
+
+    // --- the token must still be caught (anti-blind) ---
+    let buf = credential.clone().into_bytes();
+    let hits = engine.scan_chunk(&Chunk {
+        bytes: &buf,
+        offset: 0,
+        origin: ChunkOrigin::Raw,
+    });
+    assert!(
+        hits.iter().any(|h| h.rule_id == "harvest__keypat"),
+        "FALSE NEGATIVE — a Harvest bearer token is no longer detected. Quarantining \
+         `harvest__idpat` made `harvest` a known-noisy provider, and the structural sweep has \
+         now eaten the paired token rule as collateral; it needs a STRUCTURAL_ALLOWLIST entry. \
+         Rules that did fire: {:?}",
+        hits.iter().map(|h| &h.rule_id).collect::<Vec<_>>()
+    );
+
+    // --- the prose must produce no harvest hit at all (the false positive being removed) ---
+    let buf = prose.as_bytes();
+    let hits = engine.scan_chunk(&Chunk {
+        bytes: buf,
+        offset: 0,
+        origin: ChunkOrigin::Raw,
+    });
+    let harvest: Vec<_> = hits
+        .iter()
+        .filter(|h| h.rule_id.starts_with("harvest__"))
+        .map(|h| {
+            (
+                h.rule_id.clone(),
+                String::from_utf8_lossy(&buf[h.offset as usize..h.offset as usize + h.len])
+                    .into_owned(),
+            )
+        })
+        .collect();
+    assert!(
+        harvest.is_empty(),
+        "a dated lane name and an upstream issue number still match a harvest rule, so the \
+         forced-override loop this quarantine was meant to end is back: {harvest:?}"
+    );
+}
+
+#[test]
 fn marquee_secrets_are_not_missed_after_curation() {
     let secrets = marquee_secrets();
 
