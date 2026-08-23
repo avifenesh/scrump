@@ -20,6 +20,26 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   and quarantined the new bare `*.user.com` hostname detector
   (`user__userurlpat`), restoring the compatibility harness to the
   existing 123 known cross-provider false-positive floor.
+- Quarantined `harvest__idpat` — keyword `harvest` plus a bare
+  `\b([0-9]{4,9})\b`. That capture is Harvest's **account id** (the
+  `Harvest-Account-Id` header), not a credential: upstream only ever reports
+  it once paired with a verified token, and scrump deliberately does not
+  verify, so on its own it can produce nothing but noise. Measured on a
+  prose-heavy repo: **450 hits across 421 files, zero credentials** — dates
+  inside branch names (`…-harvest-fix-20260820`), upstream issue numbers
+  (`harvest fix; … vLLM #47808`), tensor dimensions, tokenizer vocab ids.
+  It had made a pre-commit gate in that repo unpassable without an
+  override on every commit.
+  - `harvest__keypat` (the 97-char bearer token, the provider's only real
+    credential) is added to `STRUCTURAL_ALLOWLIST` in the same change.
+    Without it, marking `harvest` a known-noisy provider lets the
+    structural sweep take the token rule as collateral — verified by
+    building it both ways: the token-only build reports a planted 97-char
+    Harvest token as **clean**.
+  - Zero movement on the TruffleHog compat harness (104 failures before and
+    after, 738 providers run / 677 clean both ways, `harvest` in neither
+    failure list) — the provider's positive cases never depended on the id
+    rule.
 
 ## [0.1.8] — 2026-05-20
 
