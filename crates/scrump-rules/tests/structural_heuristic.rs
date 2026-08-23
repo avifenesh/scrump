@@ -32,6 +32,13 @@ fn keeps_rules_with_distinctive_literal_anchors() {
         "privatekey__keypat",            // `BEGIN … PRIVATE KEY`
         "okta__tokenpat",                // allowlisted dual-use
         "azure_cosmosdb__dbkeypattern",  // allowlisted dual-use
+        // The Harvest bearer token (97 chars). `harvest__idpat` — the paired ACCOUNT id, a bare
+        // 4-9 digit integer — is explicitly quarantined, which makes `harvest` a known-noisy
+        // provider and puts every sibling rule of the same bare-charclass shape in reach of the
+        // structural sweep. The token rule is the only thing that detects a real Harvest
+        // credential, so it is allowlisted rather than swept. Without that allowlist entry this
+        // assertion is what goes red.
+        "harvest__keypat",
     ];
     for id in must_stay_active {
         assert!(
@@ -52,6 +59,9 @@ fn flags_bare_charclass_provider_rules() {
         "polygon__keypat",
         "customerguru__keypat",
         "wit__keypat",
+        // Harvest ACCOUNT id: keyword `harvest` + `\b([0-9]{4,9})\b`. Not a credential at all —
+        // see the TH_QUARANTINE entry for the measured hit distribution.
+        "harvest__idpat",
     ];
     for id in must_be_inactive {
         assert!(

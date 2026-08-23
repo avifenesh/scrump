@@ -119,6 +119,16 @@ pub const TH_QUARANTINE: &[&str] = &[
     "roaring__secretpat", // keyword `roaring` — duplicate shape
     "zendeskapi__token", // keyword `zendesk` + alnums — matches Go SDK identifiers
     "graphcms__idpat", // keyword `graph` + 25 alnums — matches GraphQL identifiers
+    // keyword `harvest` + `\b([0-9]{4,9})\b` — a bare 4-9 digit integer. This is Harvest's
+    // ACCOUNT id (the `Harvest-Account-Id` header), not a credential: upstream only ever reports
+    // it paired with a verified `harvest__keypat` token, and scrump deliberately does not verify,
+    // so on its own it can produce nothing but noise. Measured on a real corpus (2026-08-23):
+    // 450 hits across 421 files of one repo — dates in branch names (`…-harvest-fix-20260820`),
+    // upstream issue numbers (`harvest fix; … vLLM #47808`), tensor dims (`32768`), tokenizer
+    // vocab ids. Zero credentials. The paired token rule `harvest__keypat` stays active via
+    // STRUCTURAL_ALLOWLIST — quarantining this one makes `harvest` a "noisy provider", which
+    // would otherwise sweep the token rule up too.
+    "harvest__idpat",
     "hashicorpvaultauth__roleidpat", // keyword `role` + UUID — `role` matches every k8s/IAM role string
     "hashicorpvaultauth__secretidpat", // keyword `secret` + UUID — duplicate of docusign__secretpat
     "hive__idpat", // keyword `hive` + 17 alnums — matches code identifiers like `archiveItemConfig`
@@ -297,7 +307,18 @@ pub const TH_QUARANTINE: &[&str] = &[
 /// - `okta__tokenpat` — `\b00[a-zA-Z0-9_-]{40}\b` has only a 2-char `00`
 ///   anchor but catches real `00…`-prefixed Okta API tokens at a low
 ///   measured FP rate (~0.07 hits/MB).
-const STRUCTURAL_ALLOWLIST: &[&str] = &["azure_cosmosdb__dbkeypattern", "okta__tokenpat"];
+/// - `harvest__keypat` — `\b([a-z0-9A-Z._]{97})\b` has no anchor at all, but
+///   97 chars is a narrow enough width that it does not fire on prose, and it
+///   is the ONLY rule that detects a real Harvest bearer token. It is here
+///   because its sibling `harvest__idpat` (the bare 4-9 digit ACCOUNT id) was
+///   explicitly quarantined on 2026-08-23, which makes `harvest` a known-noisy
+///   provider and would otherwise sweep this rule up with it — trading a
+///   false-positive fix for a silent credential miss.
+const STRUCTURAL_ALLOWLIST: &[&str] = &[
+    "azure_cosmosdb__dbkeypattern",
+    "okta__tokenpat",
+    "harvest__keypat",
+];
 
 /// Returns `true` when a rule id is part of the active ruleset — i.e. it is
 /// neither on the explicit [`TH_QUARANTINE`] list nor flagged by the
