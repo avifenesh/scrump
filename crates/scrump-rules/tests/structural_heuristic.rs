@@ -39,6 +39,13 @@ fn keeps_rules_with_distinctive_literal_anchors() {
         // credential, so it is allowlisted rather than swept. Without that allowlist entry this
         // assertion is what goes red.
         "harvest__keypat",
+        // The Survey Anyplace API key (32 alnum). Its sibling `surveyanyplace__idpat` — the same
+        // shape plus a hyphen in the class, so it matched any 36-char slug near the word
+        // "survey" — is explicitly quarantined, which makes `surveyanyplace` a known-noisy
+        // provider and puts this rule in reach of the structural sweep. It is the only rule that
+        // detects a real key for this provider, and it measured zero hits on three real corpora,
+        // so it is allowlisted rather than swept. Without the allowlist entry this goes red.
+        "surveyanyplace__keypat",
     ];
     for id in must_stay_active {
         assert!(
@@ -62,6 +69,10 @@ fn flags_bare_charclass_provider_rules() {
         // Harvest ACCOUNT id: keyword `harvest` + `\b([0-9]{4,9})\b`. Not a credential at all —
         // see the TH_QUARANTINE entry for the measured hit distribution.
         "harvest__idpat",
+        // Survey Anyplace "id": keyword `(?i:survey)` + `\b([a-z0-9A-Z-]{36})\b`. The hyphen in
+        // the class means any 36-char hyphenated slug near the English word "survey" — see the
+        // TH_QUARANTINE entry for the measured captures.
+        "surveyanyplace__idpat",
     ];
     for id in must_be_inactive {
         assert!(

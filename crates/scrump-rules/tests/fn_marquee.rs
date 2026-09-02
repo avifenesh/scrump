@@ -172,6 +172,74 @@ fn microsoft_teams_webhook_requires_signature_in_any_query_position() {
 }
 
 #[test]
+fn survey_key_detected_but_a_lane_slug_is_not() {
+    // `surveyanyplace__idpat` (keyword `(?i:survey)` — the English word — plus
+    // `\b([a-z0-9A-Z-]{36})\b`) was quarantined on 2026-09-02: the hyphen in the class makes any
+    // 36-char slug near the word "survey" a hit, and one of those hits sat in a research index
+    // that nearly every change touches, so a pre-commit gate was unpassable without an override
+    // and two lanes typed one in a day. Both halves of the decision are asserted here, because
+    // each without the other is a defect: dropping the id rule is only correct if the KEY rule
+    // still fires, and keeping the key rule is only useful if the id rule has actually stopped.
+    //
+    // The key is assembled at runtime (same reason as `marquee_secrets`): this source file must
+    // not itself carry a key-shaped literal.
+    let key = fill(57, 32);
+    assert_eq!(
+        key.len(),
+        32,
+        "surveyanyplace__keypat wants exactly 32 chars"
+    );
+    assert!(
+        !key.contains('-'),
+        "the key shape excludes the hyphen — that is the whole difference from the id rule"
+    );
+
+    // Verbatim from the repo that surfaced this (research/INDEX.md line 70), and the two other
+    // captures the same pattern produced across two more repos. All three used to block a commit.
+    let prose = "| engines-kv-oversubscription-20260830 | SURVEY: no public receipts for a                  reuse-vs-recompute crossover cell (nobody publishes one). Survey only, no                  engine decision | `engines-kv-oversubscription-20260830/RESEARCH.md` |
+                 a survey of what-reads-as-trustworthy-verified-claims in engine READMEs
+                 survey of direct-subscription-patterns-revenue for the business direction
+";
+    let credential = format!("SURVEY_ANYPLACE_API_KEY={key}\n");
+
+    let detectors = default_detectors().expect("default rules must compile");
+    let engine = Engine::new(detectors);
+
+    // --- the key must still be caught (anti-blind) ---
+    let buf = credential.clone().into_bytes();
+    let hits = engine.scan_chunk(&Chunk {
+        bytes: &buf,
+        offset: 0,
+        origin: ChunkOrigin::Raw,
+    });
+    assert!(
+        hits.iter().any(|h| h.rule_id == "surveyanyplace__keypat"),
+        "FALSE NEGATIVE — a Survey Anyplace API key is no longer detected. Quarantining \
+         `surveyanyplace__idpat` made `surveyanyplace` a known-noisy provider, and the structural \
+         sweep has now eaten the paired key rule as collateral; it needs a STRUCTURAL_ALLOWLIST \
+         entry. Rules that did fire: {:?}",
+        hits.iter().map(|h| &h.rule_id).collect::<Vec<_>>()
+    );
+
+    // --- the prose must produce no surveyanyplace hit at all (the false positive being removed) ---
+    let buf = prose.as_bytes();
+    let hits = engine.scan_chunk(&Chunk {
+        bytes: buf,
+        offset: 0,
+        origin: ChunkOrigin::Raw,
+    });
+    let survey_hits: Vec<&String> = hits
+        .iter()
+        .filter(|h| h.rule_id.starts_with("surveyanyplace__"))
+        .map(|h| &h.rule_id)
+        .collect();
+    assert!(
+        survey_hits.is_empty(),
+        "prose about surveys must not read as a credential; still firing: {survey_hits:?}"
+    );
+}
+
+#[test]
 fn harvest_token_detected_but_account_id_is_not() {
     // `harvest__idpat` (keyword `harvest` + a bare 4-9 digit integer) was quarantined on
     // 2026-08-23 because it is Harvest's ACCOUNT id, not a credential, and it fired 450 times

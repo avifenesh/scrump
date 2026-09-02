@@ -20,6 +20,32 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   and quarantined the new bare `*.user.com` hostname detector
   (`user__userurlpat`), restoring the compatibility harness to the
   existing 123 known cross-provider false-positive floor.
+- Quarantined `surveyanyplace__idpat` — keyword `(?i:survey)`, the English
+  word rather than the vendor name, plus `\b([a-z0-9A-Z-]{36})\b`. The hyphen
+  inside the class is what makes it unusable: any 36-character hyphenated slug
+  within 40 characters of the word "survey" matches, and prose about surveys is
+  full of them. Measured by emulating the exact pattern over three real repos:
+  **5 hits / 4 files** in a prose-heavy one, **1 / 1** in a second, **0** in a
+  third; every capture was English text
+  (`engines-kv-oversubscription-20260830`,
+  `-what-reads-as-trustworthy-verified-`,
+  `direct-subscription-patterns-revenue`), zero credentials.
+  - Lower volume than `harvest__idpat` and worse in practice: one hit sat in a
+    research index that nearly every change in that repo touches, so the
+    pre-commit gate was unpassable without an override, and two lanes typed one
+    in a single day. A rule that teaches people to skip the scan is a recall
+    bug wearing a precision bug's clothes.
+  - `surveyanyplace__keypat` (32 alphanumerics, the provider's only real key
+    shape, and 0 hits on all three corpora) is added to
+    `STRUCTURAL_ALLOWLIST` in the same change. Without it, marking
+    `surveyanyplace` a known-noisy provider lets the structural sweep take the
+    key rule too, trading a false-positive fix for a silent credential miss.
+  - Both directions are asserted by
+    `fn_marquee::survey_key_detected_but_a_lane_slug_is_not` (a runtime-assembled
+    key must still fire; the verbatim index row and the two other real captures
+    must produce no `surveyanyplace__*` hit) and by both arms of
+    `structural_heuristic`. Each assertion was confirmed to fail with its half of
+    the change removed.
 - Quarantined `harvest__idpat` — keyword `harvest` plus a bare
   `\b([0-9]{4,9})\b`. That capture is Harvest's **account id** (the
   `Harvest-Account-Id` header), not a credential: upstream only ever reports
