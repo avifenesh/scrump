@@ -224,7 +224,7 @@ fn survey_key_detected_but_a_lane_slug_is_not() {
     // --- the prose must produce no surveyanyplace hit at all (the false positive being removed) ---
     let buf = prose.as_bytes();
     let hits = engine.scan_chunk(&Chunk {
-        bytes: &buf,
+        bytes: buf,
         offset: 0,
         origin: ChunkOrigin::Raw,
     });
