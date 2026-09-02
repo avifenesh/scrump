@@ -129,20 +129,6 @@ pub const TH_QUARANTINE: &[&str] = &[
     // STRUCTURAL_ALLOWLIST — quarantining this one makes `harvest` a "noisy provider", which
     // would otherwise sweep the token rule up too.
     "harvest__idpat",
-    // keyword `(?i:survey)` — the ENGLISH WORD, not the vendor name — plus
-    // `\b([a-z0-9A-Z-]{36})\b`. The hyphen in the class is what makes it hopeless: any 36-char
-    // hyphenated slug within 40 chars of the word "survey" matches, and prose about surveys is
-    // full of them. Measured 2026-09-02 by emulating the exact pattern over three real repos:
-    // 5 hits / 4 files in one prose-heavy repo, 1 / 1 in a second, 0 in a third; every capture
-    // was English text (`engines-kv-oversubscription-20260830`,
-    // `-what-reads-as-trustworthy-verified-`, `direct-subscription-patterns-revenue`), zero
-    // credentials. Low volume but high friction, which is worse than it sounds: one of the hits
-    // sits in a line of that repo's research index, a file nearly every change touches, so the
-    // pre-commit gate was unpassable without an override on those commits and two lanes typed
-    // one in a single day. A rule that teaches people to skip the scan is a recall bug wearing a
-    // precision bug's clothes. The paired `surveyanyplace__keypat` stays active via
-    // STRUCTURAL_ALLOWLIST, same reason as harvest.
-    "surveyanyplace__idpat",
     "hashicorpvaultauth__roleidpat", // keyword `role` + UUID — `role` matches every k8s/IAM role string
     "hashicorpvaultauth__secretidpat", // keyword `secret` + UUID — duplicate of docusign__secretpat
     "hive__idpat", // keyword `hive` + 17 alnums — matches code identifiers like `archiveItemConfig`
@@ -199,9 +185,23 @@ pub const TH_QUARANTINE: &[&str] = &[
     "sourcegraph__keypat", // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
     "smartsheets__keypat", // keyword `sheet` matches `worksheet`/`spreadsheet` + 26-37 alnums — Go type names
     "sumologickey__keypat", // keyword `sumo|accessKey` + 64 alnums — `accessKey` too generic
-    "swell__idpat",        // keyword `swell` matches `Wellknown`/`isWellFormed` + 6-24 alnums
-    "sparkpost__keypat",   // `\b([a-zA-Z0-9]{40})\b` no anchor
-    "spotifykey__idpat",   // keyword `id` + 32 alnums — duplicate hits of shopify/box
+    // keyword `(?i:survey)` — the ENGLISH WORD, not the vendor name — plus
+    // `\b([a-z0-9A-Z-]{36})\b`. The hyphen in the class is what makes it hopeless: any 36-char
+    // hyphenated slug within 40 chars of the word "survey" matches, and prose about surveys is
+    // full of them. Measured 2026-09-02 by emulating the exact pattern over three real repos:
+    // 5 hits / 4 files in one prose-heavy repo, 1 / 1 in a second, 0 in a third; every capture
+    // was English text (`engines-kv-oversubscription-20260830`,
+    // `-what-reads-as-trustworthy-verified-`, `direct-subscription-patterns-revenue`), zero
+    // credentials. Low volume but high friction, which is worse than it sounds: one of the hits
+    // sits in a line of that repo's research index, a file nearly every change touches, so the
+    // pre-commit gate was unpassable without an override on those commits and two lanes typed
+    // one in a single day. A rule that teaches people to skip the scan is a recall bug wearing a
+    // precision bug's clothes. The paired `surveyanyplace__keypat` stays active via
+    // STRUCTURAL_ALLOWLIST, same reason as harvest.
+    "surveyanyplace__idpat",
+    "swell__idpat", // keyword `swell` matches `Wellknown`/`isWellFormed` + 6-24 alnums
+    "sparkpost__keypat", // `\b([a-zA-Z0-9]{40})\b` no anchor
+    "spotifykey__idpat", // keyword `id` + 32 alnums — duplicate hits of shopify/box
     "spotifykey__secretpat", // keyword `key|secret` + 32 alnums — matches Go function names
     "tableau__tokennamepat", // keyword `name` is too generic
     "thinkific__domainpat", // keyword `thinkific` + 4-40 alnums — captures generic words like `uploader`/`wordpress`
