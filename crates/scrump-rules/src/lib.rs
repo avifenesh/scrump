@@ -129,6 +129,20 @@ pub const TH_QUARANTINE: &[&str] = &[
     // STRUCTURAL_ALLOWLIST — quarantining this one makes `harvest` a "noisy provider", which
     // would otherwise sweep the token rule up too.
     "harvest__idpat",
+    // keyword `(?i:survey)` — the ENGLISH WORD, not the vendor name — plus
+    // `\b([a-z0-9A-Z-]{36})\b`. The hyphen in the class is what makes it hopeless: any 36-char
+    // hyphenated slug within 40 chars of the word "survey" matches, and prose about surveys is
+    // full of them. Measured 2026-09-02 by emulating the exact pattern over three real repos:
+    // 5 hits / 4 files in one prose-heavy repo, 1 / 1 in a second, 0 in a third; every capture
+    // was English text (`engines-kv-oversubscription-20260830`,
+    // `-what-reads-as-trustworthy-verified-`, `direct-subscription-patterns-revenue`), zero
+    // credentials. Low volume but high friction, which is worse than it sounds: one of the hits
+    // sits in a line of that repo's research index, a file nearly every change touches, so the
+    // pre-commit gate was unpassable without an override on those commits and two lanes typed
+    // one in a single day. A rule that teaches people to skip the scan is a recall bug wearing a
+    // precision bug's clothes. The paired `surveyanyplace__keypat` stays active via
+    // STRUCTURAL_ALLOWLIST, same reason as harvest.
+    "surveyanyplace__idpat",
     "hashicorpvaultauth__roleidpat", // keyword `role` + UUID — `role` matches every k8s/IAM role string
     "hashicorpvaultauth__secretidpat", // keyword `secret` + UUID — duplicate of docusign__secretpat
     "hive__idpat", // keyword `hive` + 17 alnums — matches code identifiers like `archiveItemConfig`
@@ -307,6 +321,15 @@ pub const TH_QUARANTINE: &[&str] = &[
 /// - `okta__tokenpat` — `\b00[a-zA-Z0-9_-]{40}\b` has only a 2-char `00`
 ///   anchor but catches real `00…`-prefixed Okta API tokens at a low
 ///   measured FP rate (~0.07 hits/MB).
+/// - `surveyanyplace__keypat` — `\b([a-z0-9A-Z]{32})\b` behind the keyword
+///   `survey`, so structurally as weak as its sibling, but it is the ONLY rule
+///   that detects a real Survey Anyplace API key and it measured ZERO hits on
+///   three real corpora (the 32-char class excludes the hyphen, which is what
+///   its quarantined sibling `surveyanyplace__idpat` fires on). Kept for the
+///   same reason as `harvest__keypat`: quarantining the id rule makes
+///   `surveyanyplace` a known-noisy provider, and the structural sweep would
+///   take this one with it, trading a false-positive fix for a silent
+///   credential miss.
 /// - `harvest__keypat` — `\b([a-z0-9A-Z._]{97})\b` has no anchor at all, but
 ///   97 chars is a narrow enough width that it does not fire on prose, and it
 ///   is the ONLY rule that detects a real Harvest bearer token. It is here
@@ -318,6 +341,7 @@ const STRUCTURAL_ALLOWLIST: &[&str] = &[
     "azure_cosmosdb__dbkeypattern",
     "okta__tokenpat",
     "harvest__keypat",
+    "surveyanyplace__keypat",
 ];
 
 /// Returns `true` when a rule id is part of the active ruleset — i.e. it is
