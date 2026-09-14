@@ -40,7 +40,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 byteorder = "1"
 tar = "0.4"
 flate2 = "1"
-zstd = "0.13"
+zstd = "0.14"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 linux-perf-data = "0.13"
 object = { version = "0.36", default-features = false, features = ["std", "read_core", "elf"] }
