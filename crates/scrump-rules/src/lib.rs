@@ -9,6 +9,8 @@ use regex::bytes::Regex;
 use scrump_core::{Detector, Result, ScrumpError};
 use serde::Deserialize;
 
+mod metadata;
+
 const DEFAULT_RULES_YAML: &str = include_str!("../rules/default.yaml");
 const TRUFFLEHOG_RULES_YAML: &str = include_str!("../rules/trufflehog.yaml");
 
@@ -317,7 +319,8 @@ pub const TH_QUARANTINE: &[&str] = &[
 /// - `azure_cosmosdb__dbkeypattern` — `[A-Za-z0-9]{86}==` is unanchored
 ///   but genuinely dual-use (it caught real Grafana API-key JSON blobs in
 ///   the issue #9 corpus). Largest remaining hit source on base64-dense
-///   files; pending a keyword-anchored replacement in `default.yaml`.
+///   files. The default detector filters complete JSON SHA-512 integrity
+///   fields while retaining this rule and its credential coverage.
 /// - `okta__tokenpat` — `\b00[a-zA-Z0-9_-]{40}\b` has only a 2-char `00`
 ///   anchor but catches real `00…`-prefixed Okta API tokens at a low
 ///   measured FP rate (~0.07 hits/MB).
@@ -554,7 +557,10 @@ pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
     all.retain(|d| d.id() != "jwt_token" && !d.id().starts_with("jwt__"));
     all.push(Box::new(custom::JwtHsAware::new()));
 
-    Ok(all)
+    Ok(all
+        .into_iter()
+        .map(metadata::filter_known_metadata)
+        .collect())
 }
 
 mod custom {

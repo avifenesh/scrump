@@ -289,6 +289,16 @@ pub trait Detector: Send + Sync {
     fn post_filter(&self, _candidate: &[u8]) -> bool {
         true
     }
+    /// Optional filter with the bytes before and after this candidate in
+    /// the same chunk. The default preserves [`Detector::post_filter`].
+    ///
+    /// Context-aware detectors can recognize explicit non-secret metadata
+    /// without dropping the same candidate bytes in a credential field.
+    /// Context may be incomplete at a chunk boundary; uncertain matches
+    /// should be retained.
+    fn post_filter_with_context(&self, candidate: &[u8], _before: &[u8], _after: &[u8]) -> bool {
+        self.post_filter(candidate)
+    }
     fn verify(&self, _candidate: &[u8]) -> VerifyResult {
         VerifyResult::Unknown
     }

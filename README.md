@@ -64,12 +64,12 @@ scrump scrub some-file             # redact in place (atomic tmp+rename)
 scrump scrub some-file -o clean    # write clean copy elsewhere
 scrump scrub some-file --backup    # also keep the original at *.orig
 scrump scrub some-file --format perf    # force a specific format handler
-scrump scrub some-file --rules-path my.yaml    # add custom rules
+scrump scrub some-file --rules-path my.yaml    # use custom rules
 ```
 
 ## How detection works
 
-Two-layer ruleset:
+Three parts:
 
 1. **Curated default rules** (`crates/scrump-rules/rules/default.yaml`) —
    tightly-scoped patterns for the ML/inference ecosystem: GitHub PATs,
@@ -83,7 +83,19 @@ Two-layer ruleset:
 
 The engine supports `capture_index` for keyword-proximity patterns (e.g.
 W&B's bare 40-hex token near a `wandb` keyword) and `post_filter` for
-semantic constraints beyond regex.
+semantic constraints beyond regex. `post_filter_with_context` also receives
+the bytes before and after the selected match in its format chunk; its
+default implementation delegates to `post_filter`.
+
+The default Azure detectors exclude two complete JSON metadata shapes:
+canonical SHA-512 digests in `integrity: "sha512-…"` fields, and `store_id`
+values in Cloudflare secret bindings with nonempty `binding` and
+`secret_name` strings. The exclusion applies to that field's byte range;
+identical bytes in a credential field remain findings. Unstructured Cosmos
+keys, legacy Grafana tokens, and Azure OpenAI keys keep their original
+patterns. Incomplete, malformed, or oversized context retains the finding
+(inspection is bounded to 16 KiB on either side). Custom YAML rules are
+unchanged.
 
 ## Format support — how it stays structure-preserving
 
@@ -115,18 +127,19 @@ live under `crates/scrump-{trufflehog,presidio}-compat/`.
 every `*_test.go` under TruffleHog's `pkg/detectors/`, parses each
 parametrized test, and runs scrump against the test input.
 
-**Last full run: 2,069 of 2,192 cases pass across 743 providers
-(94.4%).** The remaining 123 are negative-case false-positives where
+**Baseline at `f6d4dbe`: 2,108 of 2,207 cases pass across 750 providers
+(95.5%).** The remaining 99 are negative-case false-positives where
 provider A's no-hit-expected input still trips provider B's
 auto-extracted `PrefixRegex` (e.g. a `sugester` test input fires the
 `tableau` rule). They are over-detection in a scrubbing context —
 nothing TruffleHog catches is missed by scrump. CI gates on
-`SCRUMP_TH_MAX_FAILURES=123`; lowering this number must accompany rule
+`SCRUMP_TH_MAX_FAILURES=99`; lowering this number must accompany rule
 fixes, and any increase fails the build. After the #9 rule curation,
 260+ structurally-broken patterns are dropped at load time (see
 `TH_QUARANTINE` in `scrump-rules`) — this is what drove the harness
 from 201 failures down to 123 and the per-MB hit rate on real SQLite
-log artifacts from ~85,000 to under 0.5.
+log artifacts from ~85,000 to under 0.5. The subsequent upstream corpus
+refresh and identifier-rule curation lowered the compatibility floor to 99.
 
 ### Microsoft Presidio (PII) cross-format
 
