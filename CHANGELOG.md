@@ -8,6 +8,9 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `Detector::post_filter_with_context` receives the bytes surrounding the
+  selected match in its format chunk. Existing detectors keep their
+  candidate-only `post_filter` behavior by default.
 - `scrump scan --fail-on-hit`: exit with status **3** when the scan finds
   at least one hit, so pre-commit hooks and CI gates can block on findings.
   The code is deliberately distinct from 1 (runtime error) and 2 (CLI usage
@@ -16,6 +19,12 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Default Azure rules no longer scrub canonical npm SHA-512 integrity
+  fields or Cloudflare Secrets Store resource IDs in complete JSON binding
+  objects. Exclusions are scoped to the matched field, preserving detection
+  of identical bytes used as credentials, raw Cosmos keys, and legacy
+  Grafana tokens. Missing or ambiguous context keeps the finding; no provider
+  is quarantined and custom rules retain their behavior.
 - Refreshed the auto-extracted TruffleHog mirror against current upstream
   and quarantined the new bare `*.user.com` hostname detector
   (`user__userurlpat`), restoring the compatibility harness to the

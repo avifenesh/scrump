@@ -795,6 +795,7 @@ dependencies = [
  "scrump-core",
  "scrump-detect",
  "serde",
+ "serde_json",
  "serde_yaml",
  "tracing",
 ]
