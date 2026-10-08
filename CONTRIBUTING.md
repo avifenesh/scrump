@@ -28,8 +28,9 @@ hand-coded detectors in `crates/scrump-rules/src/text.rs` to the default
 ruleset. It is for human-readable text (agent transcripts, tool output,
 logs, config), where `password: swordfish` and `Environment=API_TOKEN=…`
 are the secrets that matter and the binary-noise gate does not apply.
-Text-profile hits are masked with `*` rather than zero-filled; `--mask CHAR`
-overrides the mask for every hit, and `scrub -o -` streams to stdout.
+Under the text profile every hit, the default rules' included, is masked
+with `*` rather than zero-filled; `--mask CHAR` picks another character, and
+`scrub -o -` streams to stdout with status on stderr.
 
 A text-profile change must keep `tests/text_profile.rs` green on both sides:
 every secret vector masked, every prose, path and count line unchanged.

@@ -24,13 +24,15 @@ rules:
     pattern: '(?i)\b(?:client-key-data|client-certificate-data|certificate-authority-data)\s*:\s*(\S+)'
     capture_index: 1
   - id: text_slack_webhook
-    pattern: 'https://hooks\.slack\.com/services/[A-Za-z0-9/_-]{20,}'
+    pattern: 'https://hooks\.slack\.com/services/[A-Za-z0-9/_-]{15,}'
   - id: text_discord_webhook
     pattern: 'https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/[0-9]{10,}/[A-Za-z0-9_-]{20,}'
   # A private-key block cut off before its END line (a grep of the header
   # line, a truncated paste): header plus the base64 lines that follow.
   - id: text_pem_private_key_open
-    pattern: '-----BEGIN[ A-Z0-9_-]*PRIVATE KEY[ A-Z0-9_-]*-----(?:\s*[A-Za-z0-9+/=]{8,}){0,400}'
+    pattern: '-----BEGIN[ A-Z0-9_-]*PRIVATE KEY[ A-Z0-9_-]*-----(?:\s*[A-Za-z0-9+/=]{4,}){0,400}'
+  # (This also covers PGP blocks, whose "PRIVATE KEY BLOCK" END line the
+  # default private-key rule does not accept.)
   - id: text_age_secret_key
     pattern: 'AGE-SECRET-KEY-1[A-Z0-9]{58}'
   - id: text_bedrock_api_key

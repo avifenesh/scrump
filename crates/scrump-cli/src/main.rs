@@ -135,7 +135,9 @@ fn main() -> Result<()> {
             &dispatcher,
             cli.format.as_deref(),
             &engine,
-            cli.mask,
+            // The text profile masks every hit, the default rules' included:
+            // NUL bytes have no place in text a person or a model reads next.
+            cli.mask.or((cli.profile == "text").then_some('*')),
         ),
     }
 }
