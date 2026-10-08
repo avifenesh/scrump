@@ -26,7 +26,18 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   findings; the Okta API token rule is replaced by a domain-aware detector
   that reports a token only beside a tenant domain (`okta.com`,
   `oktapreview.com`, `okta-emea.com`, `okta-gov.com`, `okta.mil` at a word
-  boundary), as upstream now does. The compat failure floor stays at 99.
+  boundary), as upstream now does. Two rules the refresh brought in are
+  quarantined: `microsoftteamswebhook_v2__sigpat` (a bare `sig=` query
+  parameter) and `okta__oauthclientidpat` (a public OAuth client id); the
+  client secret itself is detected by a hand-coded
+  `okta__oauthclientsecretpat` that needs a client id and a tenant beside
+  it. A curated `okta_api_token` rule keeps the bare token redacted when
+  the tenant sits in another chunk (a SQLite cell, an HPROF record).
+  Upstream also dropped `appoptics__keypat` and `bingsubscriptionkey__keypat`,
+  renamed `microsoftteamswebhook__keypat`, `sonarcloud__keypat` and
+  `weightsandbiases__keypat` to `_v1`, and added about twenty prefix-anchored
+  rules (figma v3, humio, kong, newrelic, resend, sonarcloud v2, wandb v2,
+  solarwinds). The compat failure floor stays at 99.
 - Default Azure rules no longer scrub canonical npm SHA-512 integrity
   fields or Cloudflare Secrets Store resource IDs in complete JSON binding
   objects. Exclusions are scoped to the matched field, preserving detection

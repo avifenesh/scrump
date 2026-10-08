@@ -383,17 +383,58 @@ fn corpus_2026_10_gitlab_entropy_and_okta_domain() {
     );
 
     let token = format!("00{}", fill(9, 40));
+    // Alone, the token is kept by the curated okta_api_token rule (recall
+    // across chunks); the parity detector okta__tokenpat needs a tenant.
+    let alone = scan(&format!("okta token {token}"));
     assert!(
-        scan(&format!("okta token {token}")).is_empty(),
-        "bare okta token flagged"
+        alone.contains(&"okta_api_token".to_string())
+            && !alone.contains(&"okta__tokenpat".to_string()),
+        "{alone:?}"
     );
     assert!(
-        scan(&format!("acmecorp.okta-dnssec.com {token}")).is_empty(),
+        scan(&format!("acmecorp.okta-dnssec.com {token}"))
+            .iter()
+            .all(|r| r != "okta__tokenpat"),
         "dnssec CNAME counted as tenant"
     );
     assert!(
-        scan(&format!("acmecorp.okta.military {token}")).is_empty(),
+        scan(&format!("acmecorp.okta.military {token}"))
+            .iter()
+            .all(|r| r != "okta__tokenpat"),
         "okta.military counted as tenant"
+    );
+    let client_id = format!("0oa{}", fill(11, 17));
+    assert!(
+        scan(&format!("client_id: {client_id}")).is_empty(),
+        "public OAuth client id flagged"
+    );
+    assert!(
+        scan("https://x/api?sig=abcdef123456&y=1").is_empty(),
+        "bare sig= query parameter flagged"
+    );
+    // Domain after the token and upper case both count; a public client id
+    // alone and a bare sig= parameter are not findings; a client secret needs
+    // a client id and a tenant beside it.
+    assert!(scan(&format!("{token} ACME.OKTA.COM")).contains(&"okta__tokenpat".to_string()));
+    let client_id = format!("0oa{}", fill(11, 17));
+    assert!(
+        scan(&format!("clientId: '{client_id}'")).is_empty(),
+        "public OAuth client id flagged"
+    );
+    assert!(
+        scan("https://x/api?sig=abcdef123456&y=1").is_empty(),
+        "bare sig= query parameter flagged"
+    );
+    let secret = fill(13, 44);
+    let oauth = format!("acme.okta.com client_id: {client_id} client_secret: {secret}");
+    assert!(
+        scan(&oauth).contains(&"okta__oauthclientsecretpat".to_string()),
+        "oauth secret missed"
+    );
+    assert!(
+        !scan(&format!("client_secret: {secret}"))
+            .contains(&"okta__oauthclientsecretpat".to_string()),
+        "oauth secret without tenant flagged"
     );
     for dom in [
         "acmecorp.okta.com",
