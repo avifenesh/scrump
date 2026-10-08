@@ -254,7 +254,8 @@ pub const TH_QUARANTINE: &[&str] = &[
     "auth0oauth__domainpat", // captures `cdn.auth0.com` — a hostname, not a secret
     "hashicorpvaultauth__vaulturlpat", // captures `*.hashicorp.cloud` hostname
     "okta__domainpat",       // captures `*.okta.com` tenant hostname
-    "zendeskapi__domain",    // captures `*.zendesk.com` subdomains from filter lists
+    "okta__oauthclientidpat", // `0oa` + 17 alnums: an OAuth client id is a public application identifier, not a secret
+    "zendeskapi__domain",     // captures `*.zendesk.com` subdomains from filter lists
     // Round 14 (conda/firmware/ethereum): geth fired on TLD data.
     "fastlypersonaltoken__keypat", // keyword `fastly` + 32 alnums — matches punycode TLD data
     // Round 15 (composer/elixir/bitcoin/victoriametrics): composer doc string.
@@ -309,6 +310,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     // Broad URL extraction lacks the upstream `sig` post-filter;
     // default.yaml has a curated replacement.
     "microsoftteamswebhook_v2__urlpat",
+    "microsoftteamswebhook_v2__sigpat", // bare `[?&]sig=...`: fires on any signed URL or doc fragment; the curated microsoft_teams_webhook_v2 rule covers the real webhook
     "newrelicinsightsquerykey__accountidpat", // bare New Relic account id, not a credential
 ];
 
@@ -342,7 +344,12 @@ pub const TH_QUARANTINE: &[&str] = &[
 ///   false-positive fix for a silent credential miss.
 const STRUCTURAL_ALLOWLIST: &[&str] = &[
     "azure_cosmosdb__dbkeypattern",
+    // okta__tokenpat is the hand-coded domain-aware detector since the
+    // 2026-10 corpus refresh (see default_detectors); the id stays.
     "okta__tokenpat",
+    // okta__oauthclientsecretpat is the hand-coded client-secret detector
+    // (client id and tenant required) since the same refresh.
+    "okta__oauthclientsecretpat",
     "harvest__keypat",
     "surveyanyplace__keypat",
 ];
@@ -557,8 +564,22 @@ pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
     all.retain(|d| d.id() != "jwt_token" && !d.id().starts_with("jwt__"));
     all.push(Box::new(custom::JwtHsAware::new()));
 
+    // TruffleHog 2026-10: an Okta API token counts only next to a tenant
+    // domain (okta.com, oktapreview.com, okta-emea.com, okta-gov.com,
+    // okta.mil at a word boundary; okta-dnssec.com is a CNAME target, not a
+    // tenant). The auto-extracted token pattern is replaced by the
+    // domain-aware one for parity. Recall on a token whose tenant sits in
+    // another chunk (a SQLite cell, an HPROF record) comes from the curated
+    // `okta_api_token` rule in default.yaml, which the compat harness does
+    // not count for the okta provider. The quarantined public client id is
+    // replaced by a detector for the OAuth client secret itself.
+    all.retain(|d| d.id() != "okta__tokenpat" && d.id() != "okta__oauthclientsecretpat");
+    all.push(Box::new(custom::OktaTokenWithTenant));
+    all.push(Box::new(custom::OktaOAuthClientSecret));
+
     Ok(all
         .into_iter()
+        .map(custom::entropy_floors)
         .map(metadata::filter_known_metadata)
         .collect())
 }
@@ -566,8 +587,139 @@ pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
 mod custom {
     use base64::Engine;
     use regex::bytes::Regex;
-    use scrump_core::Detector;
+    use scrump_core::{Detector, Replacement};
     use std::sync::OnceLock;
+
+    /// TruffleHog 2026-10 gates GitLab PATs at Shannon entropy 3.6 so that
+    /// placeholders like `glpat-xxxxxxxxxxxxxxxxxxxx` are not findings. The
+    /// auto-extracted and curated GitLab rules get the same floor here.
+    pub fn entropy_floors(d: Box<dyn Detector>) -> Box<dyn Detector> {
+        let floor = match d.id() {
+            "gitlab_v2__keypat" | "gitlab_v3__keypat" | "gitlab_pat" => 3.6,
+            _ => return d,
+        };
+        Box::new(EntropyFloor { inner: d, floor })
+    }
+
+    struct EntropyFloor {
+        inner: Box<dyn Detector>,
+        floor: f64,
+    }
+
+    impl Detector for EntropyFloor {
+        fn id(&self) -> &str {
+            self.inner.id()
+        }
+        fn pattern(&self) -> &Regex {
+            self.inner.pattern()
+        }
+        fn min_entropy(&self) -> Option<f64> {
+            Some(
+                self.inner
+                    .min_entropy()
+                    .map_or(self.floor, |m| m.max(self.floor)),
+            )
+        }
+        fn capture_index(&self) -> Option<usize> {
+            self.inner.capture_index()
+        }
+        fn replacement(&self) -> Replacement {
+            self.inner.replacement()
+        }
+        fn post_filter(&self, candidate: &[u8]) -> bool {
+            self.inner.post_filter(candidate)
+        }
+        fn verify(&self, candidate: &[u8]) -> scrump_core::VerifyResult {
+            self.inner.verify(candidate)
+        }
+        fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+            self.inner
+                .post_filter_with_context(candidate, before, after)
+        }
+    }
+
+    /// Okta API token (`00` plus 40 characters) that appears in the same
+    /// chunk as an Okta tenant domain. Mirrors TruffleHog's detector, which
+    /// pairs every token with a domain and reports nothing without one.
+    ///
+    /// The chunk is the unit of context, as the data blob is upstream. In
+    /// structured formats that chunk per cell or record (SQLite, HPROF) a
+    /// token whose tenant sits in another cell is not reported; the bare
+    /// 42-character shape alone was the false positive the upstream corpus
+    /// now rejects, so this trades that recall for parity.
+    pub struct OktaTokenWithTenant;
+
+    impl OktaTokenWithTenant {
+        fn domain() -> &'static Regex {
+            static R: OnceLock<Regex> = OnceLock::new();
+            R.get_or_init(|| {
+                // Case-insensitive: a scrubber must not miss ACME.OKTA.COM.
+                Regex::new(
+                    r"(?i)\b[a-z0-9-]{1,40}\.(?:okta(?:preview|-emea|-gov)?\.com|okta\.mil)\b",
+                )
+                .expect("okta domain regex")
+            })
+        }
+    }
+
+    impl Detector for OktaTokenWithTenant {
+        fn id(&self) -> &str {
+            "okta__tokenpat"
+        }
+        fn pattern(&self) -> &Regex {
+            static R: OnceLock<Regex> = OnceLock::new();
+            R.get_or_init(|| Regex::new(r"\b00[a-zA-Z0-9_-]{40}\b").expect("okta token regex"))
+        }
+        fn post_filter_with_context(&self, _candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+            let (before, after) = okta_window(before, after);
+            let d = Self::domain();
+            d.is_match(before) || d.is_match(after)
+        }
+    }
+
+    /// Context window for the Okta detectors, as in `metadata.rs`: close to
+    /// upstream's blob size and a bound on scan time for candidate-dense files.
+    const OKTA_CONTEXT: usize = 16 * 1024;
+
+    fn okta_window<'a>(before: &'a [u8], after: &'a [u8]) -> (&'a [u8], &'a [u8]) {
+        (
+            &before[before.len().saturating_sub(OKTA_CONTEXT)..],
+            &after[..after.len().min(OKTA_CONTEXT)],
+        )
+    }
+
+    /// Okta OAuth client secret: 40 to 64 characters after a `client_secret`
+    /// keyword, with a client id (`0oa` plus 17) and a tenant domain in the
+    /// same chunk, as upstream requires. The public client id alone is not a
+    /// finding (see `okta__oauthclientidpat` in `TH_QUARANTINE`).
+    pub struct OktaOAuthClientSecret;
+
+    impl Detector for OktaOAuthClientSecret {
+        fn id(&self) -> &str {
+            "okta__oauthclientsecretpat"
+        }
+        fn pattern(&self) -> &Regex {
+            static R: OnceLock<Regex> = OnceLock::new();
+            R.get_or_init(|| {
+                Regex::new(
+                    r"(?i:client_secret|clientsecret|client-secret)(?:.|[\n\r]){0,40}?(?:^|[^a-zA-Z0-9_-])([a-zA-Z0-9_-]{40,64})(?:[^a-zA-Z0-9_-]|$)",
+                )
+                .expect("okta client secret regex")
+            })
+        }
+        fn capture_index(&self) -> Option<usize> {
+            Some(1)
+        }
+        fn post_filter_with_context(&self, _candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+            static ID: OnceLock<Regex> = OnceLock::new();
+            let id = ID.get_or_init(|| {
+                Regex::new(r"\b0oa[a-zA-Z0-9]{17}\b").expect("okta client id regex")
+            });
+            let (before, after) = okta_window(before, after);
+            let d = OktaTokenWithTenant::domain();
+            (d.is_match(before) || d.is_match(after)) && (id.is_match(before) || id.is_match(after))
+        }
+    }
 
     /// JWT detector that mirrors TruffleHog's behaviour: matches the
     /// canonical three-segment JWT shape, then base64-decodes the header
