@@ -109,6 +109,15 @@ rules:
   - id: stripe_test_secret
     pattern: '[rs]k_test_[A-Za-z0-9]{20,247}'
 
+  # ---- Okta -----------------------------------------------------------------
+  # Bare API token. The auto-extracted okta__tokenpat is replaced by a
+  # domain-aware detector for upstream parity; this curated rule keeps the
+  # token redacted when its tenant sits in another chunk (a SQLite cell, an
+  # HPROF record). Measured at about 0.07 hits/MB on real artifacts.
+  - id: okta_api_token
+    pattern: '\b00[a-zA-Z0-9_-]{40}\b'
+    min_entropy: 3.5
+
   # ---- Generic shapes -----------------------------------------------------
   - id: jwt_token
     pattern: 'eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}'

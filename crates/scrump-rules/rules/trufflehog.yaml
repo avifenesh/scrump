@@ -187,9 +187,6 @@ rules:
 - id: appointedd__keypat
   pattern: (?i:appointedd)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9=+]{88})
   capture_index: 1
-- id: appoptics__keypat
-  pattern: (?i:appoptics)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z_-]{71})\b
-  capture_index: 1
 - id: appsynergy__keypat
   pattern: (?i:appsynergy)(?:.|[\n\r]){0,40}?\b([a-z0-9]{64})\b
   capture_index: 1
@@ -257,7 +254,7 @@ rules:
   pattern: \b([a-zA-Z0-9_-]{64,})\b
   capture_index: 1
 - id: auth0oauth__domainpat
-  pattern: \b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0\.com)\b
+  pattern: \b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0(?:app)?\.com)\b
   capture_index: 1
 - id: autodesk__keypat
   pattern: (?i:autodesk)(?:.|[\n\r]){0,40}?\b([0-9A-Za-z]{32})\b
@@ -423,9 +420,6 @@ rules:
 - id: billomat__keypat
   pattern: (?i:billomat)(?:.|[\n\r]){0,40}?\b([0-9a-f]{32})\b
   capture_index: 1
-- id: bingsubscriptionkey__keypat
-  pattern: (?i:bing)(?:.|[\n\r]){0,40}?\b([a-fA-F0-9]{32})\b
-  capture_index: 1
 - id: bitbar__keypat
   pattern: (?i:bitbar)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z]{32})\b
   capture_index: 1
@@ -457,7 +451,7 @@ rules:
   pattern: (?i:blocknative)(?:.|[\n\r]){0,40}?\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b
   capture_index: 1
 - id: blogger__keypat
-  pattern: (?i:blogger)(?:.|[\n\r]){0,40}?\b([0-9A-Za-z-]{39})\b
+  pattern: (?i:blogger)(?:.|[\n\r]){0,40}?\b(AIzaSy[0-9A-Za-z_-]{33})
   capture_index: 1
 - id: boostnote__keypat
   pattern: (?i:boostnote)(?:.|[\n\r]){0,40}?\b([0-9a-f]{64})\b
@@ -1179,6 +1173,9 @@ rules:
 - id: figmapersonalaccesstoken_v2__keypat
   pattern: (?i:figma)(?:.|[\n\r]){0,40}?\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b
   capture_index: 1
+- id: figmapersonalaccesstoken_v3__keypat
+  pattern: (figp_[a-zA-Z0-9_=-]{40,54})(?:[^a-zA-Z0-9_=-]|\z)
+  capture_index: 1
 - id: fileio__keypat
   pattern: (?i:fileio)(?:.|[\n\r]){0,40}?\b([A-Z0-9.-]{39})\b
   capture_index: 1
@@ -1459,7 +1456,7 @@ rules:
   pattern: (?i:happyscribe)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z]{24})\b
   capture_index: 1
 - id: harness__keypat
-  pattern: (?i:harness)(?:.|[\n\r]){0,40}?\b(pat\.[A-Za-z0-9]{22}\.[0-9a-f]{24}\.[A-Za-z0-9]{20})\b
+  pattern: (?i:harness)(?:.|[\n\r]){0,40}?\b(pat\.[A-Za-z0-9_]{22}\.[0-9a-f]{24}\.[A-Za-z0-9]{20})\b
   capture_index: 1
 - id: harvest__keypat
   pattern: (?i:harvest)(?:.|[\n\r]){0,40}?\b([a-z0-9A-Z._]{97})\b
@@ -1540,6 +1537,9 @@ rules:
   pattern: \b(?:hf_|api_org_)[a-zA-Z0-9]{34}\b
 - id: humanity__keypat
   pattern: (?i:humanity)(?:.|[\n\r]){0,40}?\b([0-9a-z]{40})\b
+  capture_index: 1
+- id: humioapitoken__keypat
+  pattern: \b([A-Za-z0-9]{24}(?:[A-Za-z0-9]{8})?~[A-Za-z0-9]{44})\b
   capture_index: 1
 - id: hunter__keypat
   pattern: (?i:hunter)(?:.|[\n\r]){0,40}?\b([a-z0-9_-]{40})\b
@@ -1700,6 +1700,9 @@ rules:
 - id: knapsackpro__keypat
   pattern: (?i:knapsackpro)(?:.|[\n\r]){0,40}?\b([0-9a-z]{32})\b
   capture_index: 1
+- id: kong__keypat
+  pattern: \b((?:kpat_|spat_)[a-zA-Z0-9]{49})\b
+  capture_index: 1
 - id: kontent__envidpat
   pattern: (?i:kontent|env)(?:.|[\n\r]){0,40}?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b
   capture_index: 1
@@ -1796,7 +1799,7 @@ rules:
   pattern: (?i:loadmill)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z]{40})\b
   capture_index: 1
 - id: lob__keypat
-  pattern: \b((live|test)_[a-zA-Z0-9_]{35})\b
+  pattern: \b((live|test)_[a-f0-9]{35})\b
   capture_index: 1
 - id: locationiq__keypat
   pattern: \b(pk\.[a-zA-Z-0-9]{32})\b
@@ -1932,8 +1935,13 @@ rules:
 - id: metrilo__keypat
   pattern: (?i:metrilo)(?:.|[\n\r]){0,40}?\b([a-z0-9]{16})\b
   capture_index: 1
-- id: microsoftteamswebhook__keypat
+- id: microsoftteamswebhook_v1__keypat
   pattern: (https:\/\/[a-zA-Z-0-9]+\.webhook\.office\.com\/webhookb2\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\@[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\/IncomingWebhook\/[a-zA-Z-0-9]{32}\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12})
+  capture_index: 1
+- id: microsoftteamswebhook_v2__urlpat
+  pattern: https://[a-z0-9]+\.\d+\.environment\.api\.powerplatform\.com(?::\d+)?/powerautomate/automations/direct/workflows/[a-f0-9]{32}/triggers/manual/paths/invoke\?[^\s"'<>]+
+- id: microsoftteamswebhook_v2__sigpat
+  pattern: '[?&]sig=([A-Za-z0-9_\-]+)'
   capture_index: 1
 - id: mindmeister__keypat
   pattern: (?i:mindmeister)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{43})\b
@@ -2039,11 +2047,29 @@ rules:
 - id: neutrinoapi__idpat
   pattern: (?i:neutrinoapi)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{6,24})\b
   capture_index: 1
+- id: newrelicbrowserkey__keypat
+  pattern: \b(NRBR-[0-9a-f]{19})\b
+  capture_index: 1
 - id: newrelicinsightsinsertkey__keypat
   pattern: \b(NRII-[a-zA-Z0-9-_]{25})
   capture_index: 1
+- id: newrelicinsightsquerykey__keypat
+  pattern: \b(NRIQ-[a-zA-Z0-9-_]{25})
+  capture_index: 1
+- id: newrelicinsightsquerykey__accountidpat
+  pattern: (?i:relic|account|id)(?:.|[\n\r]){0,40}?\b(\d{4,10})\b
+  capture_index: 1
+- id: newreliclicensekey__keypat
+  pattern: \b(([0-9a-f]{32}|eu01xx[0-9a-f]{26})FFFFNRAL)\b
+  capture_index: 1
+- id: newrelicmobileapptoken__keypat
+  pattern: \b((AA[0-9a-f]{40}|eu01xx[0-9a-f]{36})-NRMA)\b
+  capture_index: 1
 - id: newrelicpersonalapikey__keypat
   pattern: (?i:newrelic)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9_\.]{4}-[A-Za-z0-9_\.]{42})\b
+  capture_index: 1
+- id: newrelicuserkey__keypat
+  pattern: \b(NRAK-[A-Z0-9]{27})\b
   capture_index: 1
 - id: newsapi__keypat
   pattern: (?i:newsapi)(?:.|[\n\r]){0,40}?\b([a-z0-9]{32})
@@ -2067,7 +2093,7 @@ rules:
   pattern: \b([[:alnum:]]{26}:[[:alnum:]]{8}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{12})\b
   capture_index: 1
 - id: ngrok__keypat
-  pattern: (?i:ngrok)(?:.|[\n\r]){0,40}?\b(2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20})\b
+  pattern: (?i:ngrok)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{27}_[a-zA-Z0-9]{20,21})\b
   capture_index: 1
 - id: nicereply__keypat
   pattern: (?i:nicereply)(?:.|[\n\r]){0,40}?\b([0-9a-f]{40})\b
@@ -2117,10 +2143,15 @@ rules:
 - id: octopusdeploy__urlpat
   pattern: \b([a-z0-9-]+\.octopus\.app)\b
   capture_index: 1
-- id: okta__domainpat
-  pattern: \b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b
 - id: okta__tokenpat
   pattern: \b00[a-zA-Z0-9_-]{40}\b
+- id: okta__domainpat
+  pattern: \b[a-z0-9-]{1,40}\.(?:okta(?:preview|-emea|-gov)?\.com|okta\.mil)\b
+- id: okta__oauthclientidpat
+  pattern: \b0oa[a-zA-Z0-9]{17}\b
+- id: okta__oauthclientsecretpat
+  pattern: (?i:client_secret|clientsecret|client-secret)(?:.|[\n\r]){0,40}?(?:^|[^a-zA-Z0-9_-])([a-zA-Z0-9_-]{40,64})(?:[^a-zA-Z0-9_-]|$)
+  capture_index: 1
 - id: omnisend__keypat
   pattern: (?i:omnisend)(?:.|[\n\r]){0,40}?\b([a-z0-9A-Z-]{75})\b
   capture_index: 1
@@ -2361,10 +2392,10 @@ rules:
   pattern: \b(?i)(postgres(?:ql)?)://\S+\b
   capture_index: 1
 - id: postgres__connstrpartpattern
-  pattern: ([[:alpha:]]+)='(.+?)' ?
+  pattern: ([[:alpha:]_]+)='(.+?)' ?
   capture_index: 1
 - id: posthog__keypat
-  pattern: \b(phx_[a-zA-Z0-9_]{43})\b
+  pattern: \b(phx_[a-zA-Z0-9_]{43,48})\b
   capture_index: 1
 - id: postman__keypat
   pattern: \b(PMAK-[a-zA-Z-0-9]{59})\b
@@ -2497,6 +2528,9 @@ rules:
   capture_index: 1
 - id: requestfinance__keypat
   pattern: (?i:requestfinance)(?:.|[\n\r]){0,40}?\b([0-9A-Z]{7}-[0-9A-Z]{7}-[0-9A-Z]{7}-[0-9A-Z]{7})\b
+  capture_index: 1
+- id: resend__keypat
+  pattern: \b(re_[1-9A-HJ-NP-Za-km-z]{8}_[1-9A-HJ-NP-Za-km-z]{24})\b
   capture_index: 1
 - id: restpackhtmltopdfapi__keypat
   pattern: (?i:restpack)(?:.|[\n\r]){0,40}?\b([0-9A-Za-z]{48})\b
@@ -2841,8 +2875,14 @@ rules:
 - id: snykkey__keypat
   pattern: (?i:snyk)(?:.|[\n\r]){0,40}?\b([0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b
   capture_index: 1
-- id: sonarcloud__keypat
+- id: solarwindsobservability__keypat
+  pattern: (?i:solarwinds)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z_-]{71})\b
+  capture_index: 1
+- id: sonarcloud_v1__keypat
   pattern: (?i:sonar)(?:.|[\n\r]){0,40}?(?:^|[^@])\b([0-9a-z]{40})\b
+  capture_index: 1
+- id: sonarcloud_v2__keypat
+  pattern: \b(sqco_[[:alnum:]]{59})\b
   capture_index: 1
 - id: sourcegraph__keypat
   pattern: \b(sgp_(?:[a-fA-F0-9]{16}|local)_[a-fA-F0-9]{40}|sgp_[a-fA-F0-9]{40}|[a-fA-F0-9]{40})\b
@@ -2869,7 +2909,7 @@ rules:
   pattern: (?i:id)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9]{32})\b
   capture_index: 1
 - id: square__secretpat
-  pattern: (?i:square)(?:.|[\n\r]){0,40}?(EAAA[a-zA-Z0-9\-\+\=]{60})
+  pattern: (?i:square)(?:.|[\n\r]){0,40}?(EAAA[a-zA-Z0-9\-_+=]{60})
   capture_index: 1
 - id: squareapp__keypat
   pattern: (?:sandbox-)?sq0i[a-z]{2}-[0-9A-Za-z_-]{22,43}
@@ -3338,8 +3378,11 @@ rules:
 - id: websitepulse__idpat
   pattern: (?i:websitepulse)(?:.|[\n\r]){0,40}?\b([0-9a-zA-Z._]{4,22})\b
   capture_index: 1
-- id: weightsandbiases__keypat
+- id: weightsandbiases_v1__keypat
   pattern: (?i:wandb)(?:.|[\n\r]){0,40}?\b([0-9a-f]{40})\b
+  capture_index: 1
+- id: weightsandbiases_v2__keypat
+  pattern: \b(wandb_v1_[A-Za-z0-9]{27}_[A-Za-z0-9]{49})\b
   capture_index: 1
 - id: wepay__appidpat
   pattern: \b(\d{6})\b
