@@ -8,6 +8,20 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--profile text`: the default ruleset plus detectors for secrets in
+  human-readable text (agent transcripts, tool output, logs, config):
+  `key=value` in every spelling (JSON, escaped JSON, dictionary index,
+  `:=`, `=>`), `--flag value`, Go and TypeScript declarations,
+  `Bearer`/`token`/`Basic`/`ApiKey`/`Digest` headers, URL userinfo
+  passwords, `curl -u`, `mysql -p`, cookies, kubeconfig data, webhooks,
+  open private-key blocks and bare base64 key bodies. Post filters read the
+  key and the value: credential words decide, setting suffixes
+  (`token_url`, `max_tokens`, `tokenizer`), booleans, `$VAR` references,
+  counts, code and placeholders are kept. Every hit is masked with `*`
+  (length preserving); `--mask CHAR` overrides it; `scrub -o -` streams to
+  stdout with status on stderr; `-` and other streams are read once; under
+  the text profile input is never format-sniffed.
+
 - `Detector::post_filter_with_context` receives the bytes surrounding the
   selected match in its format chunk. Existing detectors keep their
   candidate-only `post_filter` behavior by default.
