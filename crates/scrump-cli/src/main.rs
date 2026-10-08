@@ -20,6 +20,37 @@ struct Cli {
     /// Force a specific format handler (skips auto-detect).
     #[arg(long, global = true)]
     format: Option<String>,
+
+    /// Ruleset profile: `default` for capture artifacts, `text` for
+    /// human-readable text (transcripts, tool output, logs, config), which
+    /// adds key=value, header, URL and key-body detectors, masks every hit
+    /// with `*` instead of NUL, and treats its input as plain text.
+    #[arg(
+        long,
+        global = true,
+        default_value = "default",
+        conflicts_with = "rules_path"
+    )]
+    profile: Profile,
+
+    /// Replace every hit with this printable ASCII character repeated to
+    /// the hit's length, instead of each rule's own replacement.
+    #[arg(long, global = true, value_name = "CHAR", value_parser = parse_mask)]
+    mask: Option<char>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+enum Profile {
+    Default,
+    Text,
+}
+
+fn parse_mask(s: &str) -> std::result::Result<char, String> {
+    let mut it = s.chars();
+    match (it.next(), it.next()) {
+        (Some(c), None) if c.is_ascii_graphic() => Ok(c),
+        _ => Err("one printable ASCII character".into()),
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -86,10 +117,14 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let detectors = match &cli.rules_path {
-        Some(p) => scrump_rules::detectors_from_path(p)
+    let text = cli.profile == Profile::Text;
+    let detectors = match (&cli.rules_path, cli.profile) {
+        (Some(p), _) => scrump_rules::detectors_from_path(p)
             .with_context(|| format!("loading rules from {}", p.display()))?,
-        None => scrump_rules::default_detectors().context("loading default ruleset")?,
+        (None, Profile::Text) => scrump_rules::text_detectors().context("loading text profile")?,
+        (None, Profile::Default) => {
+            scrump_rules::default_detectors().context("loading default ruleset")?
+        }
     };
     let engine = Engine::new(detectors);
     let dispatcher = build_dispatcher();
@@ -106,6 +141,7 @@ fn main() -> Result<()> {
                 &path,
                 &dispatcher,
                 cli.format.as_deref(),
+                text,
                 &engine,
                 samples,
                 summary,
@@ -121,12 +157,50 @@ fn main() -> Result<()> {
             backup,
             &dispatcher,
             cli.format.as_deref(),
+            text,
             &engine,
+            // The text profile masks every hit, the default rules' included:
+            // NUL bytes have no place in text a person or a model reads next.
+            cli.mask.or(text.then_some('*')),
         ),
     }
 }
 
-fn open(d: &Dispatcher, path: &Path, force: Option<&str>) -> Result<Box<dyn Format>> {
+/// Is this path stdin or another stream that can be read only once?
+fn is_stream(path: &Path) -> bool {
+    path.as_os_str() == "-" || std::fs::metadata(path).is_ok_and(|m| !m.is_file())
+}
+
+fn open(d: &Dispatcher, path: &Path, force: Option<&str>, text: bool) -> Result<Box<dyn Format>> {
+    // `-`, /dev/stdin, a process substitution or any other pipe can be read
+    // once, so read it whole here and sniff the bytes instead of reopening
+    // the path. Under the text profile the bytes are text by definition: no
+    // format sniffing, which would route a transcript holding `ustar` at
+    // byte 257 to the tar handler.
+    if is_stream(path) {
+        if force.is_some() {
+            anyhow::bail!("--format cannot be combined with a stream");
+        }
+        let mut bytes = Vec::new();
+        if path.as_os_str() == "-" {
+            std::io::Read::read_to_end(&mut std::io::stdin().lock(), &mut bytes)
+                .context("reading stdin")?;
+        } else {
+            bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+        }
+        if text {
+            return Ok(Box::new(
+                scrump_format_passthrough::Passthrough::open_bytes(bytes, None)?,
+            ));
+        }
+        return d.open_bytes(bytes, None).context("opening stream");
+    }
+    if text && force.is_none() {
+        let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+        return Ok(Box::new(
+            scrump_format_passthrough::Passthrough::open_bytes(bytes, Some(path))?,
+        ));
+    }
     match force {
         Some(name) => d
             .open_path_with(path, name)
@@ -156,11 +230,12 @@ fn scan(
     path: &Path,
     d: &Dispatcher,
     force: Option<&str>,
+    text: bool,
     eng: &Engine,
     samples: Option<usize>,
     summary_top: usize,
 ) -> Result<usize> {
-    let fmt = open(d, path, force)?;
+    let fmt = open(d, path, force, text)?;
     println!("(format={})", fmt.name());
     let mut hit_count = 0usize;
     let cap = samples.unwrap_or(0);
@@ -274,19 +349,49 @@ fn render_sample(bytes: &[u8]) -> String {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn scrub(
     path: &Path,
     out: Option<&Path>,
     backup: bool,
     d: &Dispatcher,
     force: Option<&str>,
+    text: bool,
     eng: &Engine,
+    mask: Option<char>,
 ) -> Result<()> {
-    let mut fmt = open(d, path, force)?;
-    println!("(format={})", fmt.name());
-    let hits: Vec<_> = fmt.chunks().flat_map(|c| eng.scan_chunk(&c)).collect();
+    if is_stream(path) && out.is_none() {
+        anyhow::bail!("a stream needs -o; use -o - for stdout");
+    }
+    // `-o -` streams the scrubbed bytes to stdout; status lines then go to
+    // stderr so a pipeline reads clean output.
+    let to_stdout = out.is_some_and(|p| p.as_os_str() == "-");
+    let say = |line: String| {
+        if to_stdout {
+            eprintln!("{line}");
+        } else {
+            println!("{line}");
+        }
+    };
+    let mut fmt = open(d, path, force, text)?;
+    say(format!("(format={})", fmt.name()));
+    let mut hits: Vec<_> = fmt.chunks().flat_map(|c| eng.scan_chunk(&c)).collect();
+    if let Some(c) = mask {
+        let mut buf = [0u8; 4];
+        let pat = c.encode_utf8(&mut buf).as_bytes().to_vec();
+        for h in &mut hits {
+            h.replacement = scrump_core::Replacement::Pattern(pat.clone());
+        }
+    }
     if hits.is_empty() {
-        println!("clean: {} (0 hits, nothing to scrub)", path.display());
+        say(format!(
+            "clean: {} (0 hits, nothing to scrub)",
+            path.display()
+        ));
+        if to_stdout {
+            let bytes = fmt.to_bytes().context("serializing file")?;
+            std::io::Write::write_all(&mut std::io::stdout().lock(), &bytes)?;
+        }
         return Ok(());
     }
     if backup && out.is_none() {
@@ -296,14 +401,19 @@ fn scrub(
     }
     fmt.apply(&hits).context("applying redactions")?;
     let bytes = fmt.to_bytes().context("serializing scrubbed file")?;
+    if to_stdout {
+        std::io::Write::write_all(&mut std::io::stdout().lock(), &bytes)?;
+        say(format!("scrubbed: stdout ({} hits redacted)", hits.len()));
+        return Ok(());
+    }
     let dest = out.unwrap_or(path);
     write_atomic(dest, &bytes)
         .with_context(|| format!("writing scrubbed output to {}", dest.display()))?;
-    println!(
+    say(format!(
         "scrubbed: {} ({} hits redacted)",
         dest.display(),
         hits.len()
-    );
+    ));
     Ok(())
 }
 

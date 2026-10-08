@@ -391,8 +391,13 @@ pub fn apply_hits_in_place(buf: &mut [u8], hits: &[Hit]) -> Result<()> {
                         "empty replacement pattern".into(),
                     ));
                 }
+                // A printable mask is for text: line breaks inside the hit
+                // (a key block, a header spanning lines) stay where they
+                // are, so the masked text keeps its line structure.
                 for (i, b) in buf[start..end].iter_mut().enumerate() {
-                    *b = p[i % p.len()];
+                    if *b != b'\n' {
+                        *b = p[i % p.len()];
+                    }
                 }
             }
             Replacement::Drop => {
