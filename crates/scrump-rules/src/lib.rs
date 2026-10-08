@@ -557,8 +557,16 @@ pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
     all.retain(|d| d.id() != "jwt_token" && !d.id().starts_with("jwt__"));
     all.push(Box::new(custom::JwtHsAware::new()));
 
+    // TruffleHog 2026-10: an Okta API token counts only next to a tenant
+    // domain (okta.com, oktapreview.com, okta-emea.com, okta-gov.com,
+    // okta.mil at a word boundary; okta-dnssec.com is a CNAME target, not a
+    // tenant). The bare token pattern is replaced by the domain-aware one.
+    all.retain(|d| d.id() != "okta__tokenpat");
+    all.push(Box::new(custom::OktaTokenWithTenant));
+
     Ok(all
         .into_iter()
+        .map(custom::entropy_floors)
         .map(metadata::filter_known_metadata)
         .collect())
 }
@@ -566,8 +574,79 @@ pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
 mod custom {
     use base64::Engine;
     use regex::bytes::Regex;
-    use scrump_core::Detector;
+    use scrump_core::{Detector, Replacement};
     use std::sync::OnceLock;
+
+    /// TruffleHog 2026-10 gates GitLab PATs at Shannon entropy 3.6 so that
+    /// placeholders like `glpat-xxxxxxxxxxxxxxxxxxxx` are not findings. The
+    /// auto-extracted and curated GitLab rules get the same floor here.
+    pub fn entropy_floors(d: Box<dyn Detector>) -> Box<dyn Detector> {
+        let floor = match d.id() {
+            "gitlab_v2__keypat" | "gitlab_v3__keypat" | "gitlab_pat" => 3.6,
+            _ => return d,
+        };
+        Box::new(EntropyFloor { inner: d, floor })
+    }
+
+    struct EntropyFloor {
+        inner: Box<dyn Detector>,
+        floor: f64,
+    }
+
+    impl Detector for EntropyFloor {
+        fn id(&self) -> &str {
+            self.inner.id()
+        }
+        fn pattern(&self) -> &Regex {
+            self.inner.pattern()
+        }
+        fn min_entropy(&self) -> Option<f64> {
+            Some(
+                self.inner
+                    .min_entropy()
+                    .map_or(self.floor, |m| m.max(self.floor)),
+            )
+        }
+        fn capture_index(&self) -> Option<usize> {
+            self.inner.capture_index()
+        }
+        fn replacement(&self) -> Replacement {
+            self.inner.replacement()
+        }
+        fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+            self.inner
+                .post_filter_with_context(candidate, before, after)
+        }
+    }
+
+    /// Okta API token (`00` plus 40 characters) that appears in the same
+    /// chunk as an Okta tenant domain. Mirrors TruffleHog's detector, which
+    /// pairs every token with a domain and reports nothing without one.
+    pub struct OktaTokenWithTenant;
+
+    impl OktaTokenWithTenant {
+        fn domain() -> &'static Regex {
+            static R: OnceLock<Regex> = OnceLock::new();
+            R.get_or_init(|| {
+                Regex::new(r"\b[a-z0-9-]{1,40}\.(?:okta(?:preview|-emea|-gov)?\.com|okta\.mil)\b")
+                    .expect("okta domain regex")
+            })
+        }
+    }
+
+    impl Detector for OktaTokenWithTenant {
+        fn id(&self) -> &str {
+            "okta__tokenpat"
+        }
+        fn pattern(&self) -> &Regex {
+            static R: OnceLock<Regex> = OnceLock::new();
+            R.get_or_init(|| Regex::new(r"\b00[a-zA-Z0-9_-]{40}\b").expect("okta token regex"))
+        }
+        fn post_filter_with_context(&self, _candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+            let d = Self::domain();
+            d.is_match(before) || d.is_match(after)
+        }
+    }
 
     /// JWT detector that mirrors TruffleHog's behaviour: matches the
     /// canonical three-segment JWT shape, then base64-decodes the header

@@ -354,3 +354,57 @@ fn marquee_secrets_are_not_missed_after_curation() {
         missed
     );
 }
+
+/// TruffleHog corpus refresh 2026-10: a low-entropy GitLab placeholder is
+/// not a finding, and an Okta token counts only beside a tenant domain.
+#[test]
+fn corpus_2026_10_gitlab_entropy_and_okta_domain() {
+    let engine = Engine::new(default_detectors().expect("default rules"));
+    let scan = |s: &str| -> Vec<String> {
+        engine
+            .scan_chunk(&Chunk {
+                bytes: s.as_bytes(),
+                offset: 0,
+                origin: ChunkOrigin::Raw,
+            })
+            .into_iter()
+            .map(|h| h.rule_id)
+            .collect()
+    };
+    let placeholder = format!("gitlab_secret = \"glpat-{}\"", "x".repeat(20));
+    assert!(
+        scan(&placeholder).iter().all(|r| !r.starts_with("gitlab")),
+        "placeholder flagged: {placeholder}"
+    );
+    let real = format!("gitlab_secret = \"glpat-{}\"", fill(7, 20));
+    assert!(
+        scan(&real).iter().any(|r| r.starts_with("gitlab")),
+        "real-shaped PAT missed"
+    );
+
+    let token = format!("00{}", fill(9, 40));
+    assert!(
+        scan(&format!("okta token {token}")).is_empty(),
+        "bare okta token flagged"
+    );
+    assert!(
+        scan(&format!("acmecorp.okta-dnssec.com {token}")).is_empty(),
+        "dnssec CNAME counted as tenant"
+    );
+    assert!(
+        scan(&format!("acmecorp.okta.military {token}")).is_empty(),
+        "okta.military counted as tenant"
+    );
+    for dom in [
+        "acmecorp.okta.com",
+        "acmecorp.oktapreview.com",
+        "acmecorp.okta-emea.com",
+        "acmecorp.okta-gov.com",
+        "acmecorp.okta.mil",
+    ] {
+        assert!(
+            scan(&format!("{dom} {token}")).contains(&"okta__tokenpat".to_string()),
+            "okta token beside {dom} missed"
+        );
+    }
+}

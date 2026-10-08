@@ -19,6 +19,14 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- TruffleHog corpus refresh 2026-10 (upstream `0e42739`): the auto-extracted
+  ruleset is re-extracted; GitLab PAT rules (`gitlab_v2__keypat`,
+  `gitlab_v3__keypat`, curated `gitlab_pat`) carry TruffleHog's 3.6
+  entropy floor so `glpat-xxxxxxxxxxxxxxxxxxxx` placeholders are not
+  findings; the Okta API token rule is replaced by a domain-aware detector
+  that reports a token only beside a tenant domain (`okta.com`,
+  `oktapreview.com`, `okta-emea.com`, `okta-gov.com`, `okta.mil` at a word
+  boundary), as upstream now does. The compat failure floor stays at 99.
 - Default Azure rules no longer scrub canonical npm SHA-512 integrity
   fields or Cloudflare Secrets Store resource IDs in complete JSON binding
   objects. Exclusions are scoped to the matched field, preserving detection
