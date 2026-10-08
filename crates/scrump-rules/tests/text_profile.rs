@@ -159,6 +159,20 @@ fn text_secrets_are_masked() {
         let out = scrub(&line);
         assert!(!out.contains(&body[..30]), "{line:?} -> {out:?}");
     }
+    // Masks never touch a line break: the line count of a window is stable
+    // even when one hit spans lines (a key block).
+    let block = format!(
+        "{}{}\nMIIEvQIBADANBg\nMIIEvQIBADANBg\nnext line",
+        "-----BEGIN ", "PRIVATE KEY-----"
+    );
+    let out = scrub(&block);
+    assert_eq!(
+        out.matches('\n').count(),
+        block.matches('\n').count(),
+        "{out:?}"
+    );
+    assert!(out.ends_with("next line"), "{out:?}");
+    assert!(scrub("api_token=4827193650284716").ends_with(&"*".repeat(16)));
     // A key block cut off before END still loses its body.
     let open = format!(
         "{}{}\nMIIEvQIBADANBg\nMIIEvQIBADANBg",

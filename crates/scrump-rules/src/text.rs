@@ -414,8 +414,9 @@ fn value_is_secret(key: &str, sep: u8, value: &[u8]) -> bool {
     let bare = trim_quotes(value);
     let lk = key.to_ascii_lowercase().replace('-', "_");
     // Counts: tokens_per_second=12345, total_tokens: 4096, #new-token: 4096,
-    // ms/token = 80.6. A number under any token-named key is a count.
-    if lk.contains("token") && is_number(bare) {
+    // ms/token = 80.6. A short number under a token-named key is a count; a
+    // run of 16 or more digits (api_token=4827193650284716) is a token.
+    if lk.contains("token") && is_number(bare) && bare.len() < 16 {
         return false;
     }
     // *_tokens settings hold counts or names, not secrets, unless random.
