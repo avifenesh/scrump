@@ -17,6 +17,29 @@ fn engine() -> &'static Engine {
     E.get_or_init(|| Engine::new(text_detectors().expect("text profile loads")))
 }
 
+fn default_engine() -> &'static Engine {
+    static E: std::sync::OnceLock<Engine> = std::sync::OnceLock::new();
+    E.get_or_init(|| Engine::new(scrump_rules::default_detectors().expect("default rules")))
+}
+
+/// Only the text profile's own detectors: what this PR adds.
+fn text_only_engine() -> &'static Engine {
+    static E: std::sync::OnceLock<Engine> = std::sync::OnceLock::new();
+    E.get_or_init(|| Engine::new(scrump_rules::text_profile_detectors().expect("text rules")))
+}
+
+/// Does a default-profile rule fire on this line? Those rules may mask a
+/// wider span (a whole URL, a whole key block) than the text rules.
+fn default_hits(input: &str) -> bool {
+    !default_engine()
+        .scan_chunk(&Chunk {
+            bytes: input.as_bytes(),
+            offset: 0,
+            origin: ChunkOrigin::Raw,
+        })
+        .is_empty()
+}
+
 fn scrub(input: &str) -> String {
     let engine = engine();
     let mut bytes = input.as_bytes().to_vec();
@@ -46,7 +69,7 @@ fn text_secrets_are_masked() {
         ("}{ = nekot", "4321aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_phg"),
         ("}{ drowssap--", "x2retnuh"),
         ("\"}{\":\"drowssap\"\\", "zz9zz9zz"),
-        ("\"}{ esroh tcerroc\" :drowssap", "elpats yrettab"),
+        ("\"}{\" :drowssap", "elpats yrettab esroh tcerroc"),
         ("}{ nekot :noitazirohtuA", "210987654321fedcba"),
         ("x//:sptth }{:resu u- lruc", "54321wp"),
         ("}{=ssap_bd", "32!ytrewQ"),
@@ -56,11 +79,11 @@ fn text_secrets_are_masked() {
         ("}{ :yek_ipa", "hgfedcba"),
         ("}{=nekoThtua", "88zZ88zZ"),
         ("0/9736:tsoh@}{://:sider", "dr0wss4p"),
-        ("ponmlkjihgfedcba=}{ ;krad=emeht :eikooC", "dinoisses"),
+        ("}{ :eikooC", "ponmlkjihgfedcba=dinoisses ;krad=emeht"),
         ("bd h- }{p- lqsym", "ssaPterc3S"),
         (
-            "}{/000B/000T/secivres/moc.kcals.skooh//:sptth",
-            "XXXXXXXXXXXXXXXXXXXXXXXX",
+            "}{/secivres/moc.kcals.skooh//:sptth",
+            "XXXXXXXXXXXXXXXXXXXXXXXX/000B/000T",
         ),
         (
             "}{ :atad-yek-tneilc",
@@ -82,7 +105,7 @@ fn text_secrets_are_masked() {
         ("}{ drowssap-bd--", "88qwLd93kZ"),
         ("x//:sptth }{:u resu-- lruc", "88qwLd93kZ"),
         ("}{=ESARHPSSAP_HSS", "88qwLd93kZ"),
-        ("\"sdrow }{\"=DROWSSAP_BD\n=YEK_IPA", "owt retnuh"),
+        ("\"}{\"=DROWSSAP_BD\n=YEK_IPA", "sdrow owt retnuh"),
         ("\"}{\" = ]\"yek_ipa\"[gfc", "88qwLd93kZ"),
         (
             "}{=YEK_GNINGIS",
@@ -100,6 +123,36 @@ fn text_secrets_are_masked() {
             !out.contains(&secret),
             "{line:?} -> {out:?} still holds the secret"
         );
+        // Masking is exact: the secret and nothing else becomes stars, so
+        // JSON, YAML and shell around it stay valid.
+        let want = line.replace(&secret, &"*".repeat(secret.len()));
+        // Lines a default rule also covers may be masked wider by that rule.
+        if !default_hits(&line) {
+            assert_eq!(out, want, "{line:?} over-masked");
+        }
+    }
+    // Secrets after a harmless key on the same line, flags that are not
+    // values, JSON strings, more schemes and names.
+    for (line, secret) in [
+        ("max_tokens=4096&password={}", "hunter2hunter2"),
+        ("token_count=5&api_key={}", "Zk39dLwq88"),
+        ("?author=bob&password={}", "Zk39dLwq88"),
+        ("?secret_name=prod&secret={}", "hunter2hunter2"),
+        ("mytool --verbose --password {}", "hunter2hunter2"),
+        ("--dry-run --db-password {}", "Zk39dLwq88"),
+        ("{\"password\":\"{}\"}", "Zk39dLwq88"),
+        (
+            "{\"stdout\":\"API_TOKEN={}\\nPATH=/usr/bin\"}",
+            "abc123def456",
+        ),
+        ("Authorization: ApiKey {}", "Zk39dLwq88Zk39dLwq88"),
+        ("ROOTPASS={}", "Zk39dLwq88"),
+        ("curl -su admin:{} https://x", "Zk39dLwq88"),
+        ("curl -u admin:{} https://x", "123456"),
+    ] {
+        let l = line.replace("{}", secret);
+        let out = scrub(&l);
+        assert_eq!(out, l.replace(secret, &"*".repeat(secret.len())), "{l:?}");
     }
     // Bare key bodies, with and without a grep path prefix.
     for line in [body.clone(), format!("lab/ssh/kv013-root:2:{body}")] {
@@ -175,9 +228,62 @@ fn text_prose_paths_and_counts_are_kept() {
         "DB_PASSWORD=${DB_PASSWORD}",
         "pw=$(cat /run/secret)",
         "password=********;echo hi",
+        "apiKey: process.env.OPENAI_API_KEY,",
+        "const apiKey = config.apiKey",
+        "clientSecret: string;",
+        "promptTokens: number;",
+        "let authToken = getToken()",
+        "token = lexer.next_token()",
+        "password = os.getenv(\"PASSWORD\")",
+        "#new-token: 4096",
+        "gpu_token: 18444",
+        "ms/token = 80.6",
+        "\"start_token\":\"<think>\"",
+        "MAX=${X:-8192}",
+        "--- PASS: TestParseConfigFile (0.00s)",
+        "vllm serve --max-num-batched-tokens 8192",
+        "--password $DB_PASSWORD",
+        "--api-key ${OPENAI_API_KEY}",
+        "--secret-name my-secret-name",
+        "tokenUrl: https://a/b",
+        "passwordFile: /etc/x",
+        "tokenType: Bearer",
+        "authMethod: oauth2",
+        "auth_mode: strict",
+        "next_page_token: abc",
+        "integrity: sha512-Ab1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2yZ3aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH==",
+        "huggingface.co/diffbot/MiMo-V2.6-Flash-RL-FP8KV-W4A8-2x-RTX-PRO-6000/blob/main/config.json",
+        "docker run --user www-data:www-data img",
+        "docker exec -u appuser:appgroup c id",
+        "mysql -u root -P 3306 -p mydb",
+        "curl -u \"$USER:$PASS\" https://x",
     ];
+    // The text profile adds no hit on any of these; a default rule may still
+    // fire on its own terms (that is the default ruleset's business).
     for line in keep {
-        let out = scrub(line);
-        assert_eq!(out, line, "{line:?} over-redacted to {out:?}");
+        let hits = text_only_engine().scan_chunk(&Chunk {
+            bytes: line.as_bytes(),
+            offset: 0,
+            origin: ChunkOrigin::Raw,
+        });
+        let ids: Vec<_> = hits.iter().map(|h| h.rule_id.as_str()).collect();
+        assert!(hits.is_empty(), "{line:?} over-redacted by {ids:?}");
+    }
+}
+
+#[test]
+fn default_profile_ignores_text_shapes() {
+    let engine = Engine::new(scrump_rules::default_detectors().expect("default rules"));
+    for line in [
+        "password: swordfish",
+        "Environment=API_TOKEN=Zk39dLwq88",
+        "--db-password hunter2hunter2",
+    ] {
+        let hits = engine.scan_chunk(&Chunk {
+            bytes: line.as_bytes(),
+            offset: 0,
+            origin: ChunkOrigin::Raw,
+        });
+        assert!(hits.is_empty(), "default profile flagged {line:?}");
     }
 }

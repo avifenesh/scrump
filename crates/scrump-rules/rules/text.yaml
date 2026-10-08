@@ -6,31 +6,36 @@
 rules:
   # user:password@ in a URL; the user may be empty (redis://:pw@host).
   - id: text_url_userinfo_password
-    pattern: '://[^\s/:@''"]*:([^\s/@''"]{3,})@'
+    pattern: '(?-u)://[^\s/:@''"]*:([^\s/@''"\\]{3,})@'
     capture_index: 1
   # curl -u user:pw, curl --user user:pw; the password must hold a letter so
   # docker run -u 1000:1000 is left alone.
+  # The user starts with a letter and the password holds a digit, an upper
+  # case letter or a symbol, so `docker run -u 1000:1000` and
+  # `--user www-data:www-data` are left alone.
   - id: text_curl_user_password
-    pattern: '(?:^|\s)(?:-u|--user)[ =]+[^\s:-][^\s:]*:([^\s]*[A-Za-z][^\s]*)'
+    pattern: '(?-u)(?:^|\s)(?:-s?u|--user)[ =]+[A-Za-z][^\s:''"]*:([^\s''"\\$]*[0-9A-Z!@#%^*][^\s''"\\]*)'
     capture_index: 1
   # mysql -pPASSWORD, sshpass -p X, docker login -p X
   - id: text_dash_p_password
-    pattern: '(?i)\b(?:mysql|mysqldump|mysqladmin|sshpass|docker\s+login)\b[^\n]*?\s-p\s*([^\s''"-][^\s''"]{3,})'
+    pattern: '(?-u)\b(?i:mysql|mysqldump|mysqladmin|sshpass|docker\s+login)\b[^\n]*?\s-p([^\s''"-][^\s''"]{3,})'
     capture_index: 1
   - id: text_cookie_header
-    pattern: '(?i)\b(?:set-)?cookie\s*:\s*([^\n]+)'
+    pattern: '(?-u)(?i)\b(?:set-)?cookie\s*:\s*([^\n"\\]+)'
     capture_index: 1
   - id: text_kubeconfig_data
-    pattern: '(?i)\b(?:client-key-data|client-certificate-data|certificate-authority-data)\s*:\s*(\S+)'
+    pattern: '(?-u)(?i)\b(?:client-key-data|client-certificate-data|certificate-authority-data)["'']?\s*:\s*"?([A-Za-z0-9+/=]{16,})'
     capture_index: 1
   - id: text_slack_webhook
-    pattern: 'https://hooks\.slack\.com/services/[A-Za-z0-9/_-]{15,}'
+    pattern: '(?-u)https://hooks\.slack\.com/services/([A-Za-z0-9/_-]{15,})'
+    capture_index: 1
   - id: text_discord_webhook
-    pattern: 'https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/[0-9]{10,}/[A-Za-z0-9_-]{20,}'
+    pattern: '(?-u)https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/[0-9]{10,}/([A-Za-z0-9_-]{20,})'
+    capture_index: 1
   # A private-key block cut off before its END line (a grep of the header
   # line, a truncated paste): header plus the base64 lines that follow.
   - id: text_pem_private_key_open
-    pattern: '-----BEGIN[ A-Z0-9_-]*PRIVATE KEY[ A-Z0-9_-]*-----(?:\s*[A-Za-z0-9+/=]{4,}){0,400}'
+    pattern: '(?-u)-----BEGIN[ A-Z0-9_-]*PRIVATE KEY[ A-Z0-9_-]*-----(?:\s*[A-Za-z0-9+/=]{4,}){0,400}'
   # (This also covers PGP blocks, whose "PRIVATE KEY BLOCK" END line the
   # default private-key rule does not accept.)
   - id: text_age_secret_key

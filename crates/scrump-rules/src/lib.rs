@@ -801,10 +801,21 @@ mod custom {
 /// detectors in [`text`]). Hits from the text detectors are masked with a
 /// printable pattern rather than zero-filled.
 pub fn text_detectors() -> Result<Vec<Box<dyn Detector>>> {
-    let mut all = default_detectors()?;
-    all.extend(parse_yaml_masked(TEXT_RULES_YAML)?);
-    all.extend(text::detectors());
+    // Every hit is masked, the default rules' included: NUL bytes have no
+    // place in text a person or a model reads next.
+    let mut all: Vec<Box<dyn Detector>> = default_detectors()?
+        .into_iter()
+        .map(|d| Box::new(Masked(d)) as Box<dyn Detector>)
+        .collect();
+    all.extend(text_profile_detectors()?);
     Ok(all)
+}
+
+/// Only the detectors the text profile adds on top of the default ruleset.
+pub fn text_profile_detectors() -> Result<Vec<Box<dyn Detector>>> {
+    let mut v = parse_yaml_masked(TEXT_RULES_YAML)?;
+    v.extend(text::detectors());
+    Ok(v)
 }
 
 /// Parse YAML rules whose hits are masked with `*` instead of zero-filled.
@@ -813,12 +824,15 @@ fn parse_yaml_masked(s: &str) -> Result<Vec<Box<dyn Detector>>> {
         serde_yaml::from_str(s).map_err(|e| ScrumpError::Other(format!("yaml parse: {e}")))?;
     file.rules
         .into_iter()
-        .map(|def| YamlDetector::from_def(def).map(|d| Box::new(Masked(d)) as Box<dyn Detector>))
+        .map(|def| {
+            YamlDetector::from_def(def)
+                .map(|d| Box::new(Masked(Box::new(d) as Box<dyn Detector>)) as Box<dyn Detector>)
+        })
         .collect()
 }
 
-/// A YAML detector whose replacement is a printable mask.
-struct Masked(YamlDetector);
+/// A detector whose replacement is a printable mask.
+struct Masked(Box<dyn Detector>);
 
 impl Detector for Masked {
     fn id(&self) -> &str {
@@ -835,6 +849,12 @@ impl Detector for Masked {
     }
     fn replacement(&self) -> Replacement {
         Replacement::Pattern(b"*".to_vec())
+    }
+    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+        self.0.post_filter_with_context(candidate, before, after)
+    }
+    fn verify(&self, candidate: &[u8]) -> scrump_core::VerifyResult {
+        self.0.verify(candidate)
     }
 }
 
