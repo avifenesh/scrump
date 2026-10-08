@@ -21,6 +21,20 @@ Rules:
 Add at least one positive and one negative test fixture under
 `fixtures/rules/<id>/` and ensure `cargo test --workspace` passes.
 
+## The text profile
+
+`scrump --profile text` adds `crates/scrump-rules/rules/text.yaml` and the
+hand-coded detectors in `crates/scrump-rules/src/text.rs` to the default
+ruleset. It is for human-readable text (agent transcripts, tool output,
+logs, config), where `password: swordfish` and `Environment=API_TOKEN=…`
+are the secrets that matter and the binary-noise gate does not apply.
+Text-profile hits are masked with `*` rather than zero-filled; `--mask CHAR`
+overrides the mask for every hit, and `scrub -o -` streams to stdout.
+
+A text-profile change must keep `tests/text_profile.rs` green on both sides:
+every secret vector masked, every prose, path and count line unchanged.
+Store secret-shaped vectors reversed, as that file does.
+
 ## Adding a new format handler
 
 Each capture format is a separate crate `crates/scrump-format-<name>/`

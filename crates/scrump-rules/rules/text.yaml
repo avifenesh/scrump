@@ -1,0 +1,47 @@
+# Text profile: shapes that only make sense in human-readable text (agent
+# transcripts, tool output, logs, config). They are kept out of the default
+# ruleset because keyword-anchored rules flood binaries; on text the same
+# shapes are the secrets that matter. Loaded by `scrump --profile text`
+# together with the default ruleset and the hand-coded text detectors.
+rules:
+  # user:password@ in a URL; the user may be empty (redis://:pw@host).
+  - id: text_url_userinfo_password
+    pattern: '://[^\s/:@''"]*:([^\s/@''"]{3,})@'
+    capture_index: 1
+  # curl -u user:pw, curl --user user:pw; the password must hold a letter so
+  # docker run -u 1000:1000 is left alone.
+  - id: text_curl_user_password
+    pattern: '(?:^|\s)(?:-u|--user)[ =]+[^\s:-][^\s:]*:([^\s]*[A-Za-z][^\s]*)'
+    capture_index: 1
+  # mysql -pPASSWORD, sshpass -p X, docker login -p X
+  - id: text_dash_p_password
+    pattern: '(?i)\b(?:mysql|mysqldump|mysqladmin|sshpass|docker\s+login)\b[^\n]*?\s-p\s*([^\s''"-][^\s''"]{3,})'
+    capture_index: 1
+  - id: text_cookie_header
+    pattern: '(?i)\b(?:set-)?cookie\s*:\s*([^\n]+)'
+    capture_index: 1
+  - id: text_kubeconfig_data
+    pattern: '(?i)\b(?:client-key-data|client-certificate-data|certificate-authority-data)\s*:\s*(\S+)'
+    capture_index: 1
+  - id: text_slack_webhook
+    pattern: 'https://hooks\.slack\.com/services/[A-Za-z0-9/_-]{20,}'
+  - id: text_discord_webhook
+    pattern: 'https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/[0-9]{10,}/[A-Za-z0-9_-]{20,}'
+  # A private-key block cut off before its END line (a grep of the header
+  # line, a truncated paste): header plus the base64 lines that follow.
+  - id: text_pem_private_key_open
+    pattern: '-----BEGIN[ A-Z0-9_-]*PRIVATE KEY[ A-Z0-9_-]*-----(?:\s*[A-Za-z0-9+/=]{8,}){0,400}'
+  - id: text_age_secret_key
+    pattern: 'AGE-SECRET-KEY-1[A-Z0-9]{58}'
+  - id: text_bedrock_api_key
+    pattern: 'ABSK[A-Za-z0-9+/=_-]{20,}'
+  - id: text_stripe_webhook_secret
+    pattern: 'whsec_[A-Za-z0-9_-]{16,}'
+  - id: text_docker_pat
+    pattern: 'dckr_pat_[A-Za-z0-9_-]{16,}'
+  - id: text_shopify_token
+    pattern: 'shp(?:at|ss)_[A-Za-z0-9]{16,}'
+  - id: text_sendgrid_key
+    pattern: 'SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}'
+  - id: text_npm_token
+    pattern: 'npm_[A-Za-z0-9]{30,}'

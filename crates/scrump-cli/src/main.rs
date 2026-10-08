@@ -20,6 +20,18 @@ struct Cli {
     /// Force a specific format handler (skips auto-detect).
     #[arg(long, global = true)]
     format: Option<String>,
+
+    /// Ruleset profile: `default` for capture artifacts, `text` for
+    /// human-readable text (transcripts, tool output, logs, config), which
+    /// adds key=value, header, URL and key-body detectors and masks their
+    /// hits with `*` instead of NUL.
+    #[arg(long, global = true, default_value = "default", value_parser = ["default", "text"])]
+    profile: String,
+
+    /// Replace every hit with this printable character repeated to the
+    /// hit's length, instead of each rule's own replacement.
+    #[arg(long, global = true, value_name = "CHAR")]
+    mask: Option<char>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -86,10 +98,11 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let detectors = match &cli.rules_path {
-        Some(p) => scrump_rules::detectors_from_path(p)
+    let detectors = match (&cli.rules_path, cli.profile.as_str()) {
+        (Some(p), _) => scrump_rules::detectors_from_path(p)
             .with_context(|| format!("loading rules from {}", p.display()))?,
-        None => scrump_rules::default_detectors().context("loading default ruleset")?,
+        (None, "text") => scrump_rules::text_detectors().context("loading text profile")?,
+        (None, _) => scrump_rules::default_detectors().context("loading default ruleset")?,
     };
     let engine = Engine::new(detectors);
     let dispatcher = build_dispatcher();
@@ -122,11 +135,23 @@ fn main() -> Result<()> {
             &dispatcher,
             cli.format.as_deref(),
             &engine,
+            cli.mask,
         ),
     }
 }
 
 fn open(d: &Dispatcher, path: &Path, force: Option<&str>) -> Result<Box<dyn Format>> {
+    // `-` and /dev/stdin: a pipe can be read once, so read it whole here and
+    // let the dispatcher sniff the bytes instead of reopening the path.
+    if path.as_os_str() == "-" || path.as_os_str() == "/dev/stdin" {
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut std::io::stdin().lock(), &mut bytes)
+            .context("reading stdin")?;
+        if force.is_some() {
+            anyhow::bail!("--format cannot be combined with stdin");
+        }
+        return d.open_bytes(bytes, None).context("opening stdin");
+    }
     match force {
         Some(name) => d
             .open_path_with(path, name)
@@ -281,12 +306,37 @@ fn scrub(
     d: &Dispatcher,
     force: Option<&str>,
     eng: &Engine,
+    mask: Option<char>,
 ) -> Result<()> {
+    // `-o -` streams the scrubbed bytes to stdout; status lines then go to
+    // stderr so a pipeline reads clean output.
+    let to_stdout = out.is_some_and(|p| p.as_os_str() == "-");
+    let say = |line: String| {
+        if to_stdout {
+            eprintln!("{line}");
+        } else {
+            println!("{line}");
+        }
+    };
     let mut fmt = open(d, path, force)?;
-    println!("(format={})", fmt.name());
-    let hits: Vec<_> = fmt.chunks().flat_map(|c| eng.scan_chunk(&c)).collect();
+    say(format!("(format={})", fmt.name()));
+    let mut hits: Vec<_> = fmt.chunks().flat_map(|c| eng.scan_chunk(&c)).collect();
+    if let Some(c) = mask {
+        let mut buf = [0u8; 4];
+        let pat = c.encode_utf8(&mut buf).as_bytes().to_vec();
+        for h in &mut hits {
+            h.replacement = scrump_core::Replacement::Pattern(pat.clone());
+        }
+    }
     if hits.is_empty() {
-        println!("clean: {} (0 hits, nothing to scrub)", path.display());
+        say(format!(
+            "clean: {} (0 hits, nothing to scrub)",
+            path.display()
+        ));
+        if to_stdout {
+            let bytes = fmt.to_bytes().context("serializing file")?;
+            std::io::Write::write_all(&mut std::io::stdout().lock(), &bytes)?;
+        }
         return Ok(());
     }
     if backup && out.is_none() {
@@ -296,14 +346,19 @@ fn scrub(
     }
     fmt.apply(&hits).context("applying redactions")?;
     let bytes = fmt.to_bytes().context("serializing scrubbed file")?;
+    if to_stdout {
+        std::io::Write::write_all(&mut std::io::stdout().lock(), &bytes)?;
+        say(format!("scrubbed: stdout ({} hits redacted)", hits.len()));
+        return Ok(());
+    }
     let dest = out.unwrap_or(path);
     write_atomic(dest, &bytes)
         .with_context(|| format!("writing scrubbed output to {}", dest.display()))?;
-    println!(
+    say(format!(
         "scrubbed: {} ({} hits redacted)",
         dest.display(),
         hits.len()
-    );
+    ));
     Ok(())
 }
 

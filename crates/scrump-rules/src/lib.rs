@@ -6,13 +6,15 @@
 use std::path::Path;
 
 use regex::bytes::Regex;
-use scrump_core::{Detector, Result, ScrumpError};
+use scrump_core::{Detector, Replacement, Result, ScrumpError};
 use serde::Deserialize;
 
 mod metadata;
+pub mod text;
 
 const DEFAULT_RULES_YAML: &str = include_str!("../rules/default.yaml");
 const TRUFFLEHOG_RULES_YAML: &str = include_str!("../rules/trufflehog.yaml");
+const TEXT_RULES_YAML: &str = include_str!("../rules/text.yaml");
 
 /// Auto-extracted TruffleHog rules whose patterns produce unusable noise on
 /// real artifacts (issue #9). Each entry was added based on an empirical
@@ -791,6 +793,48 @@ mod custom {
             // If `alg` starts with HS (HS256, HS384, HS512, etc.), drop.
             !after.starts_with("HS")
         }
+    }
+}
+
+/// The text profile: the default ruleset plus the shapes that only make
+/// sense in human-readable text (`rules/text.yaml` and the hand-coded
+/// detectors in [`text`]). Hits from the text detectors are masked with a
+/// printable pattern rather than zero-filled.
+pub fn text_detectors() -> Result<Vec<Box<dyn Detector>>> {
+    let mut all = default_detectors()?;
+    all.extend(parse_yaml_masked(TEXT_RULES_YAML)?);
+    all.extend(text::detectors());
+    Ok(all)
+}
+
+/// Parse YAML rules whose hits are masked with `*` instead of zero-filled.
+fn parse_yaml_masked(s: &str) -> Result<Vec<Box<dyn Detector>>> {
+    let file: RulesFile =
+        serde_yaml::from_str(s).map_err(|e| ScrumpError::Other(format!("yaml parse: {e}")))?;
+    file.rules
+        .into_iter()
+        .map(|def| YamlDetector::from_def(def).map(|d| Box::new(Masked(d)) as Box<dyn Detector>))
+        .collect()
+}
+
+/// A YAML detector whose replacement is a printable mask.
+struct Masked(YamlDetector);
+
+impl Detector for Masked {
+    fn id(&self) -> &str {
+        self.0.id()
+    }
+    fn pattern(&self) -> &Regex {
+        self.0.pattern()
+    }
+    fn min_entropy(&self) -> Option<f64> {
+        self.0.min_entropy()
+    }
+    fn capture_index(&self) -> Option<usize> {
+        self.0.capture_index()
+    }
+    fn replacement(&self) -> Replacement {
+        Replacement::Pattern(b"*".to_vec())
     }
 }
 
