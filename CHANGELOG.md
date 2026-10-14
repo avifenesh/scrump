@@ -6,6 +6,11 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- zip 9. `ZipFile::name()` failures are invalid archives. Building from
+  source needs Rust 1.88 (zip 9.0.2's floor).
+
 ### Added
 
 - `--profile text`: the default ruleset plus detectors for secrets in

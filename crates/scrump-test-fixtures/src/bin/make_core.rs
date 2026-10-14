@@ -47,10 +47,10 @@ fn note_blob(name: &str, ntype: u32, desc: &[u8]) -> Vec<u8> {
     buf.extend_from_slice(name_bytes);
     buf.push(0);
     let padded_name = round_up(namesz as usize, 4);
-    buf.extend(std::iter::repeat(0u8).take(padded_name - namesz as usize));
+    buf.extend(std::iter::repeat_n(0u8, padded_name - namesz as usize));
     buf.extend_from_slice(desc);
     let padded_desc = round_up(descsz as usize, 4);
-    buf.extend(std::iter::repeat(0u8).take(padded_desc - descsz as usize));
+    buf.extend(std::iter::repeat_n(0u8, padded_desc - descsz as usize));
     buf
 }
 
@@ -122,7 +122,7 @@ fn main() {
     load_payload.extend_from_slice(b"LANG=C.UTF-8\0");
     // Pad to 0x1000 so the segment looks like a real page.
     let pad = round_up(load_payload.len(), 0x1000) - load_payload.len();
-    load_payload.extend(std::iter::repeat(0u8).take(pad));
+    load_payload.extend(std::iter::repeat_n(0u8, pad));
 
     // ---- layout ------------------------------------------------------------
     let e_phoff: u64 = EHDR_SIZE as u64;

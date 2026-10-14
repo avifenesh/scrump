@@ -25,7 +25,7 @@ edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/avifenesh/scrump"
 authors = ["Avi Fenesh"]
-rust-version = "1.75"
+rust-version = "1.88"
 
 [workspace.dependencies]
 anyhow = "1"

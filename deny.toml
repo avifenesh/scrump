@@ -11,7 +11,12 @@ all-features = true
 [advisories]
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-ignore = []
+# RUSTSEC-2024-0449: unsafe-libyaml is archived. serde_yaml 0.9 has no
+# upgrade. It only parses our own rules YAML. Not from the zip bump.
+# A parser swap is a separate change; do not widen this list.
+ignore = [
+    { id = "RUSTSEC-2024-0449", reason = "no upgrade; own rules YAML only" },
+]
 
 [licenses]
 # Allow-list approach: only licenses we've explicitly vetted are permitted.

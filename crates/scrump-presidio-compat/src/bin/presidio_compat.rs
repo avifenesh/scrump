@@ -221,7 +221,7 @@ fn build_perf_data(strs: &[&str]) -> Vec<u8> {
             .unwrap();
         cmdline_payload.extend_from_slice(raw);
         cmdline_payload.push(0);
-        cmdline_payload.extend(std::iter::repeat(0u8).take(padded - with_nul));
+        cmdline_payload.extend(std::iter::repeat_n(0u8, padded - with_nul));
     }
 
     let attrs_offset: u64 = 104;
@@ -298,7 +298,7 @@ fn build_core_dump(text: &str) -> Vec<u8> {
     load_payload.extend_from_slice(text.as_bytes());
     load_payload.push(0);
     let pad = round_up(load_payload.len(), 0x1000) - load_payload.len();
-    load_payload.extend(std::iter::repeat(0u8).take(pad));
+    load_payload.extend(std::iter::repeat_n(0u8, pad));
 
     let e_phoff: u64 = EHDR_SIZE as u64;
     let phnum: u16 = 1;
