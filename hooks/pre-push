@@ -1,0 +1,23 @@
+#!/bin/sh
+# scrump pre-push hook: blocks a push if any file changed in the pushed commits
+# contains a secret. Install: save as .git/hooks/pre-push and chmod +x.
+# Bypass a false positive once with: git push --no-verify
+command -v scrump >/dev/null || { echo "pre-push: scrump not installed, skipping secret scan" >&2; exit 0; }
+zero=0000000000000000000000000000000000000000
+tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT
+status=0
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue                        # deleting a branch
+  if [ "$remote_sha" = "$zero" ]; then range="$local_sha --not --remotes"; else range="$remote_sha..$local_sha"; fi
+  for path in $(git log --format= --name-only --diff-filter=AM $range | sort -u); do
+    git cat-file -e "$local_sha:$path" 2>/dev/null || continue  # changed then deleted
+    git show "$local_sha:$path" > "$tmp/blob"
+    if ! scrump scan "$tmp/blob" --profile text --fail-on-hit >"$tmp/out" 2>&1; then
+      echo "pre-push: possible secret in $path" >&2
+      sed -n 's/.*rule=\([^ ]*\).*/  rule: \1/p' "$tmp/out" | sort -u >&2
+      status=1
+    fi
+  done
+done
+[ $status -eq 0 ] || echo "pre-push: push blocked by scrump. Fix the file, or use --no-verify if it is a false positive." >&2
+exit $status
