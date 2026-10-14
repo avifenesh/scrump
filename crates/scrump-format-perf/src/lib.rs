@@ -274,7 +274,7 @@ mod tests {
         cmdline_payload.extend_from_slice(&(planted.len() as u32).to_le_bytes());
         for s in planted {
             let with_nul = s.len() + 1;
-            let padded = if with_nul % NAME_ALIGN == 0 {
+            let padded = if with_nul.is_multiple_of(NAME_ALIGN) {
                 with_nul
             } else {
                 with_nul + (NAME_ALIGN - with_nul % NAME_ALIGN)

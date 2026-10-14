@@ -25,7 +25,7 @@ edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/avifenesh/scrump"
 authors = ["Avi Fenesh"]
-rust-version = "1.75"
+rust-version = "1.88"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -41,7 +41,7 @@ byteorder = "1"
 tar = "0.4"
 flate2 = "1"
 zstd = "0.14"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 linux-perf-data = "0.13"
 object = { version = "0.36", default-features = false, features = ["std", "read_core", "elf"] }
 rusqlite = { version = "0.40", features = ["bundled"] }

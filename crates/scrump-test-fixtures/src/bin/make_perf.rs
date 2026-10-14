@@ -54,7 +54,7 @@ fn write_string_blob(buf: &mut Vec<u8>, s: &str) {
     buf.extend_from_slice(raw);
     buf.push(0);
     // zero-fill up to `padded`
-    buf.extend(std::iter::repeat(0u8).take(padded - with_nul));
+    buf.extend(std::iter::repeat_n(0u8, padded - with_nul));
 }
 
 fn build_cmdline_section(strs: &[String]) -> Vec<u8> {
