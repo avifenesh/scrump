@@ -1,31 +1,52 @@
 #!/bin/sh
 # scrump pre-push hook: blocks a push if any file version added or modified by
-# the pushed commits contains a secret (including ones later removed). Install: save as .git/hooks/pre-push and chmod +x.
+# the pushed commits contains a secret, including versions a later commit
+# removed (they are still public in history). Fails closed on git errors.
+#
+# Install: save as .git/hooks/pre-push and chmod +x (or use core.hooksPath).
 # Bypass a false positive once with: git push --no-verify
 command -v scrump >/dev/null || { echo "pre-push: scrump not installed, skipping secret scan" >&2; exit 0; }
+
 zero=0000000000000000000000000000000000000000
 tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT
+tab=$(printf '\t')
 status=0
+
+fail() { echo "pre-push: $1; blocking push (use --no-verify to override)" >&2; exit 1; }
+
 while read -r _ local_sha _ remote_sha; do
-  [ "$local_sha" = "$zero" ] && continue                        # deleting a branch
-  if [ "$remote_sha" = "$zero" ]; then range="$local_sha --not --remotes"; else range="$remote_sha..$local_sha"; fi
-  # Scan every version of every file the pushed commits add or modify, not just
-  # the tip: a secret committed and then removed in the same push is still public.
-  # $range is intentionally unquoted: it is one or several git arguments.
-  # shellcheck disable=SC2086
-  git rev-list $range > "$tmp/commits"
-  while IFS= read -r commit; do
-    git diff-tree --root --no-commit-id --name-only -r --diff-filter=AM "$commit" |
-      while IFS= read -r path; do printf '%s\t%s\n' "$(git rev-parse "$commit:$path")" "$path"; done
-  done < "$tmp/commits" | sort -u -k1,1 > "$tmp/blobs"
-  while IFS="$(printf '\t')" read -r blob path; do               # handles spaces in names
-    git cat-file blob "$blob" > "$tmp/blob"
-    if ! scrump scan "$tmp/blob" --profile text --fail-on-hit >"$tmp/out" 2>&1; then
-      echo "pre-push: possible secret in $path (blob ${blob%"${blob#???????}"})" >&2
-      sed -n 's/.*rule=\([^ ]*\).*/  rule: \1/p' "$tmp/out" | sort -u >&2
-      status=1
-    fi
+  [ "$local_sha" = "$zero" ] && continue                      # deleting a ref
+
+  # Commits being published. For a new ref, or a force push whose old remote
+  # tip is not available locally, take everything not already on a remote.
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    git rev-list "$remote_sha..$local_sha" > "$tmp/commits" || fail "cannot list commits $remote_sha..$local_sha"
+  else
+    git rev-list "$local_sha" --not --remotes > "$tmp/commits" || fail "cannot list commits for $local_sha"
+  fi
+
+  # Raw diff gives the new blob id directly, so odd or quoted path names never
+  # matter for the lookup. -m includes changes introduced by merge commits.
+  : > "$tmp/blobs"
+  while read -r commit; do
+    git -c core.quotePath=false diff-tree -r -m --root --no-commit-id --diff-filter=AM "$commit" > "$tmp/raw" || fail "cannot diff $commit"
+    # ":<oldmode> <newmode> <oldsha> <newsha> <status>\t<path>"; skip submodules (160000).
+    awk -v t="$tab" '$2 != "160000" { split($0, p, t); print $4 t p[2] }' "$tmp/raw" >> "$tmp/blobs"
+  done < "$tmp/commits"
+  sort -u -k1,1 "$tmp/blobs" -o "$tmp/blobs"
+
+  while IFS="$tab" read -r blob path; do
+    git cat-file blob "$blob" > "$tmp/blob" || fail "cannot read blob $blob ($path)"
+    rc=0; scrump scan "$tmp/blob" --profile text --fail-on-hit > "$tmp/out" 2>&1 || rc=$?
+    case $rc in
+      0) ;;
+      3) echo "pre-push: possible secret in $path (blob $(echo "$blob" | cut -c1-7))" >&2
+         sed -n 's/.*rule=\([^ ]*\).*/  rule: \1/p' "$tmp/out" | sort -u >&2
+         status=1 ;;
+      *) fail "scrump failed (exit $rc) on $path: $(tail -1 "$tmp/out")" ;;
+    esac
   done < "$tmp/blobs"
 done
+
 [ $status -eq 0 ] || echo "pre-push: push blocked by scrump. Fix the file, or use --no-verify if it is a false positive." >&2
 exit $status
