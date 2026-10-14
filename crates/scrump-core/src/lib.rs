@@ -426,8 +426,8 @@ mod tests {
 
     #[test]
     fn entropy_of_two_balanced_bytes_is_one() {
-        let bytes: Vec<u8> = (0..100)
-            .map(|i| if i % 2 == 0 { 0u8 } else { 1u8 })
+        let bytes: Vec<u8> = (0..100u32)
+            .map(|i| if i.is_multiple_of(2) { 0u8 } else { 1u8 })
             .collect();
         assert!((shannon_entropy(&bytes) - 1.0).abs() < 1e-9);
     }

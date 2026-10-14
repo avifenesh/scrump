@@ -126,12 +126,12 @@ fn build_noise_corpus() -> Vec<u8> {
         blob.push(alphabet[idx]);
         // Inject UUID-shaped tokens periodically so the UUID-keyword rules
         // are stressed too.
-        if blob.len() % 73 == 0 {
+        if blob.len().is_multiple_of(73) {
             blob.extend_from_slice(b" 4f9e2a8b-9c1d-4e7f-b3a4-1234567890ab ");
         }
         // And short alphanumeric runs (4-byte) so the mapbox-style runaway
         // pattern (no boundary, no keyword) has lots of substrate.
-        if blob.len() % 41 == 0 {
+        if blob.len().is_multiple_of(41) {
             blob.extend_from_slice(b" info warn data name user org id status ");
         }
     }

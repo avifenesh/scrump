@@ -4,7 +4,7 @@
 pub fn pad_to(bytes: &mut Vec<u8>, align: usize) {
     let m = bytes.len() % align;
     if m != 0 {
-        bytes.extend(std::iter::repeat(0u8).take(align - m));
+        bytes.extend(std::iter::repeat_n(0u8, align - m));
     }
 }
 

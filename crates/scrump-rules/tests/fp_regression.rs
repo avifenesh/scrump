@@ -127,10 +127,10 @@ fn build_noise_corpus() -> Vec<u8> {
             .wrapping_add(1442695040888963407);
         let idx = ((seed >> 33) as usize) % alphabet.len();
         out.push(alphabet[idx]);
-        if out.len() % 73 == 0 {
+        if out.len().is_multiple_of(73) {
             out.extend_from_slice(b" 4f9e2a8b-9c1d-4e7f-b3a4-1234567890ab ");
         }
-        if out.len() % 41 == 0 {
+        if out.len().is_multiple_of(41) {
             out.extend_from_slice(b" info warn data name user org id status ");
         }
     }
