@@ -69,7 +69,7 @@ scrump scrub some-file --rules-path my.yaml    # use custom rules
 
 ## Block secrets before they go public (git pre-push hook)
 
-[`hooks/pre-push`](hooks/pre-push) scans every version of every file added or modified by the commits you are pushing, including a secret you committed and then removed in a later commit (it would still be public in history), and refuses the push if anything matches:
+[`hooks/pre-push`](hooks/pre-push) scans every version of every file added, modified, renamed or type-changed by the commits you are pushing, including a secret you committed and then removed in a later commit (it would still be public in history), and refuses the push if anything matches:
 
 ```sh
 cargo install --git https://github.com/avifenesh/scrump scrump-cli
@@ -84,7 +84,7 @@ pre-push: possible secret in config.env
 pre-push: push blocked by scrump. Fix the file, or use --no-verify if it is a false positive.
 ```
 
-It uses the `text` profile (source, config and logs), includes changes made in merge commits, and fails closed: if git cannot list or read what is being pushed (for example a force push over a remote tip you never fetched it falls back to everything not already on a remote), the push is blocked rather than waved through. New branches are checked against everything not already on a remote. If `scrump` is not installed the hook warns and lets the push through. To use it in every repo, put it in a shared hooks directory and run `git config --global core.hooksPath <dir>`. Remember that a secret that was already pushed has to be rotated, not just deleted.
+It uses the `text` profile (source, config and logs), includes changes made in merge commits, and fails closed: if git or scrump cannot list or read what is being pushed, the push is blocked rather than waved through. A new branch, or a force push whose old tip is not in this clone, is checked against everything not already on that remote, so a commit that exists only on some other remote is not treated as already public. If `scrump` is not installed the hook warns and lets the push through. To use it in every repo, put it in a shared hooks directory and run `git config --global core.hooksPath <dir>`. A secret that was already pushed has to be rotated, not just deleted.
 
 ## How detection works
 
