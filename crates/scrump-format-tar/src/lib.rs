@@ -369,7 +369,11 @@ fn extract_zip(raw: &[u8], dispatcher: &Dispatcher) -> Result<Vec<ExtractedMembe
         let mut entry = zr
             .by_index(i)
             .map_err(|e| ScrumpError::InvalidFile(format!("zip entry {i}: {e}")))?;
-        let name = entry.name().to_owned();
+        // zip 9 returns Result: UTF-8, else CP437. A bad name is an invalid archive.
+        let name = entry
+            .name()
+            .map_err(|e| ScrumpError::InvalidFile(format!("zip entry {i} name: {e}")))?
+            .into_owned();
         let mode = entry.unix_mode().unwrap_or(0o644);
         let mtime = 0u64; // zip stores mtime differently; ignore for now
         let is_dir = entry.is_dir();
