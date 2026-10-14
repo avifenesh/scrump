@@ -69,7 +69,7 @@ scrump scrub some-file --rules-path my.yaml    # use custom rules
 
 ## Block secrets before they go public (git pre-push hook)
 
-[`hooks/pre-push`](hooks/pre-push) scans every file changed in the commits you are pushing (the committed content, not your working tree) and refuses the push if anything matches:
+[`hooks/pre-push`](hooks/pre-push) scans every version of every file added or modified by the commits you are pushing, including a secret you committed and then removed in a later commit (it would still be public in history), and refuses the push if anything matches:
 
 ```sh
 cargo install --git https://github.com/avifenesh/scrump scrump-cli

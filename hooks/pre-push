@@ -1,6 +1,6 @@
 #!/bin/sh
-# scrump pre-push hook: blocks a push if any file changed in the pushed commits
-# contains a secret. Install: save as .git/hooks/pre-push and chmod +x.
+# scrump pre-push hook: blocks a push if any file version added or modified by
+# the pushed commits contains a secret (including ones later removed). Install: save as .git/hooks/pre-push and chmod +x.
 # Bypass a false positive once with: git push --no-verify
 command -v scrump >/dev/null || { echo "pre-push: scrump not installed, skipping secret scan" >&2; exit 0; }
 zero=0000000000000000000000000000000000000000
@@ -9,15 +9,23 @@ status=0
 while read -r _ local_sha _ remote_sha; do
   [ "$local_sha" = "$zero" ] && continue                        # deleting a branch
   if [ "$remote_sha" = "$zero" ]; then range="$local_sha --not --remotes"; else range="$remote_sha..$local_sha"; fi
-  for path in $(git log --format= --name-only --diff-filter=AM $range | sort -u); do
-    git cat-file -e "$local_sha:$path" 2>/dev/null || continue  # changed then deleted
-    git show "$local_sha:$path" > "$tmp/blob"
+  # Scan every version of every file the pushed commits add or modify, not just
+  # the tip: a secret committed and then removed in the same push is still public.
+  # $range is intentionally unquoted: it is one or several git arguments.
+  # shellcheck disable=SC2086
+  git rev-list $range > "$tmp/commits"
+  while IFS= read -r commit; do
+    git diff-tree --root --no-commit-id --name-only -r --diff-filter=AM "$commit" |
+      while IFS= read -r path; do printf '%s\t%s\n' "$(git rev-parse "$commit:$path")" "$path"; done
+  done < "$tmp/commits" | sort -u -k1,1 > "$tmp/blobs"
+  while IFS="$(printf '\t')" read -r blob path; do               # handles spaces in names
+    git cat-file blob "$blob" > "$tmp/blob"
     if ! scrump scan "$tmp/blob" --profile text --fail-on-hit >"$tmp/out" 2>&1; then
-      echo "pre-push: possible secret in $path" >&2
+      echo "pre-push: possible secret in $path (blob ${blob%"${blob#???????}"})" >&2
       sed -n 's/.*rule=\([^ ]*\).*/  rule: \1/p' "$tmp/out" | sort -u >&2
       status=1
     fi
-  done
+  done < "$tmp/blobs"
 done
 [ $status -eq 0 ] || echo "pre-push: push blocked by scrump. Fix the file, or use --no-verify if it is a false positive." >&2
 exit $status
