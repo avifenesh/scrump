@@ -67,6 +67,25 @@ scrump scrub some-file --format perf    # force a specific format handler
 scrump scrub some-file --rules-path my.yaml    # use custom rules
 ```
 
+## Block secrets before they go public (git pre-push hook)
+
+[`hooks/pre-push`](hooks/pre-push) scans every version of every file added, modified, renamed or type-changed by the commits you are pushing, including a secret you committed and then removed in a later commit (it would still be public in history), and refuses the push if anything matches:
+
+```sh
+cargo install --git https://github.com/avifenesh/scrump scrump-cli
+curl -fsSL https://raw.githubusercontent.com/avifenesh/scrump/main/hooks/pre-push -o .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+
+```text
+$ git push
+pre-push: possible secret in config.env
+  rule: github_pat_classic
+pre-push: push blocked by scrump. Fix the file, or use --no-verify if it is a false positive.
+```
+
+It uses the `text` profile (source, config and logs), includes changes made in merge commits, and fails closed: if git or scrump cannot list or read what is being pushed, the push is blocked rather than waved through. A ref that points straight at a blob or a tree (or a tag of one) is scanned too, not only branches of commits. A new branch, or a force push whose old tip is not in this clone, is checked against the tips that destination reports, not against local remote-tracking refs (those can be stale, or left behind after the remote URL changes). Replace refs are ignored, because the pack git sends does not honor them either. If `scrump` is not installed the hook warns and lets the push through. To use it in every repo, put it in a shared hooks directory and run `git config --global core.hooksPath <dir>`. A secret that was already pushed has to be rotated, not just deleted.
+
 ## How detection works
 
 Three parts:

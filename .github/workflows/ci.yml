@@ -64,6 +64,9 @@ jobs:
           cp target/release/scrump "$HOME/.local/bin/scrump"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      - name: pre-push hook
+        run: bash tests/pre_push_hook.sh
+
       - name: phase 0 (passthrough)
         run: bash tests/e2e.sh
       - name: phase 1 (perf.data)
