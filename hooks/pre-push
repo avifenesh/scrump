@@ -1,0 +1,186 @@
+#!/bin/sh
+# scrump pre-push hook: block a push if any blob it would publish contains a
+# secret. That includes a blob a later commit removed (it is still public in
+# history), a blob introduced by a merge or a file-type change, and a blob or
+# tree pushed on its own (for example a tag that does not point at a commit).
+# Fails closed when git or scrump cannot inspect the push.
+#
+# Replace refs are ignored. The pack git sends does not honor them, so a
+# replace ref must not be able to show the hook a clean object while the
+# original bytes go to the remote.
+#
+# Install: save as .git/hooks/pre-push and chmod +x (or use core.hooksPath).
+# Bypass a false positive once with: git push --no-verify
+command -v scrump >/dev/null 2>&1 || {
+  echo "pre-push: scrump not installed, skipping secret scan" >&2
+  exit 0
+}
+
+zero=0000000000000000000000000000000000000000
+tmp=$(mktemp -d) || {
+  echo "pre-push: cannot create a temp dir; blocking push" >&2
+  exit 1
+}
+trap 'rm -rf "$tmp"' EXIT
+tab=$(printf '\t')
+status=0
+# $1 is the remote name, $2 the URL git is actually pushing to.
+remote_name=${1-}
+remote_url=${2-}
+
+fail() {
+  echo "pre-push: $1; blocking push (use --no-verify to override)" >&2
+  exit 1
+}
+
+# Every git read below must see the objects the pack will contain.
+git() {
+  command git --no-replace-objects "$@"
+}
+
+# Commits to publish when this update has no old tip we can walk from.
+# Do not trust refs/remotes/<name>: a tracking ref can be stale, or can
+# still name commits from a previous URL after `git remote set-url`.
+# Ask the destination itself. Tips we do not have locally are skipped;
+# they cannot hide a commit we are about to send.
+load_remote_tips() {
+  [ -n "$tips_loaded" ] && return 0
+  tips_loaded=1
+  : >"$tmp/exclude"
+  [ -n "$remote_url" ] || return 0
+  if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$remote_url" >"$tmp/tips" 2>"$tmp/lserr"; then
+    fail "cannot see what ${remote_name:-the remote} already has ($(tail -n 1 "$tmp/lserr"))"
+  fi
+  while read -r sha _; do
+    [ -n "$sha" ] || continue
+    git cat-file -e "$sha^{commit}" >/dev/null 2>&1 </dev/null || continue
+    printf '^%s\n' "$sha" >>"$tmp/exclude"
+  done <"$tmp/tips"
+}
+
+list_unpushed() {
+  load_remote_tips
+  {
+    printf '%s\n' "$local_sha"
+    cat "$tmp/exclude"
+  } >"$tmp/revs"
+  git rev-list --stdin <"$tmp/revs" >"$tmp/commits" ||
+    fail "cannot list commits for $local_sha"
+}
+
+# stdin: <local ref> SP <local sha> SP <remote ref> SP <remote sha>
+# Git and scrump below read /dev/null so a later ref on stdin is not consumed.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+
+  : >"$tmp/blobs"
+  if git rev-parse -q --verify "$local_sha^{commit}" >/dev/null 2>&1 </dev/null; then
+    if [ "$remote_sha" != "$zero" ] &&
+      git cat-file -e "$remote_sha^{commit}" >/dev/null 2>&1 </dev/null; then
+      git rev-list "$remote_sha..$local_sha" >"$tmp/commits" </dev/null ||
+        fail "cannot list commits $remote_sha..$local_sha"
+    else
+      list_unpushed
+    fi
+
+    while read -r commit; do
+      # diff.renames=false: never collapse a delete+add into status R.
+      # --diff-filter=d keeps every non-deletion, including type changes (T)
+      # and renames, whose new blob --diff-filter=AM would drop.
+      # -m includes content introduced by a merge. Blob ids come from the raw
+      # line, so a quoted path cannot hide the object.
+      git -c diff.renames=false -c core.quotePath=false diff-tree \
+        -r -m --root --no-commit-id --diff-filter=d "$commit" >"$tmp/raw" </dev/null ||
+        fail "cannot diff $commit"
+      # :<oldmode> <newmode> <oldsha> <newsha> <status>\t<path>
+      # Skip gitlinks (mode 160000). Reject a line we cannot parse.
+      awk -v t="$tab" '
+        function bad() { exit 2 }
+        function issha(s) {
+          return (length(s) == 40 || length(s) == 64) && s ~ /^[0-9a-f]+$/
+        }
+        {
+          if ($2 == "160000") next
+          if (issha($4)) {
+            if ($4 ~ /^0+$/) next
+            n = split($0, p, t)
+            if (n < 2 || p[2] == "") bad()
+            path = p[2]
+            for (i = 3; i <= n; i++) path = path t p[i]
+            print $4 t path
+            next
+          }
+          bad()
+        }
+      ' "$tmp/raw" >>"$tmp/blobs" || fail "cannot read the diff of $commit"
+    done <"$tmp/commits"
+  else
+    # A tag, blob or tree ref. rev-list on these prints nothing and exits 0,
+    # which used to let the bytes through unscanned.
+    git cat-file -e "$local_sha" >/dev/null 2>&1 </dev/null ||
+      fail "cannot read object $local_sha"
+    peeled=$(git rev-parse "$local_sha^{}") || fail "cannot peel $local_ref"
+    kind=$(git cat-file -t "$peeled") || fail "cannot tell the type of $local_ref"
+    case $kind in
+      blob)
+        # A raw object has no file path. Name the remote ref being updated
+        # (a direct sha push puts the object id in the local-ref field).
+        label=$remote_ref
+        [ -n "$label" ] || label=$local_ref
+        printf '%s%s%s\n' "$peeled" "$tab" "$label" >>"$tmp/blobs"
+        ;;
+      tree)
+        git ls-tree -r "$peeled" >"$tmp/raw" </dev/null ||
+          fail "cannot list tree $local_ref"
+        # <mode> SP blob SP <sha>\t<path>. Skip gitlinks. Reject anything else.
+        awk -v t="$tab" '
+          function bad() { exit 2 }
+          function issha(s) {
+            return (length(s) == 40 || length(s) == 64) && s ~ /^[0-9a-f]+$/
+          }
+          {
+            n = split($0, p, t)
+            if (n < 2 || p[2] == "") bad()
+            split(p[1], f, " ")
+            if (f[1] == "160000") next
+            if (f[2] != "blob" || !issha(f[3])) bad()
+            path = p[2]
+            for (i = 3; i <= n; i++) path = path t p[i]
+            print f[3] t path
+          }
+        ' "$tmp/raw" >>"$tmp/blobs" || fail "cannot read tree $local_ref"
+        ;;
+      *)
+        fail "ref $local_ref points at a $kind, which cannot be scanned"
+        ;;
+    esac
+  fi
+
+  sort -t "$tab" -u -k1,1 "$tmp/blobs" -o "$tmp/blobs" ||
+    fail "cannot collect blobs"
+
+  while IFS="$tab" read -r blob path; do
+    [ -n "$blob" ] || continue
+    git cat-file blob "$blob" >"$tmp/blob" </dev/null ||
+      fail "cannot read blob $blob ($path)"
+    rc=0
+    scrump scan "$tmp/blob" --profile text --fail-on-hit >"$tmp/out" 2>&1 </dev/null ||
+      rc=$?
+    case $rc in
+      0) ;;
+      3)
+        echo "pre-push: possible secret in $path (blob $(printf '%.7s' "$blob"))" >&2
+        sed -n 's/.*rule=\([^ ]*\).*/  rule: \1/p' "$tmp/out" | sort -u >&2
+        status=1
+        ;;
+      *)
+        fail "scrump failed (exit $rc) on $path: $(tail -n 1 "$tmp/out")"
+        ;;
+    esac
+  done <"$tmp/blobs"
+done
+
+if [ "$status" -ne 0 ]; then
+  echo "pre-push: push blocked by scrump. Fix the file, or use --no-verify if it is a false positive." >&2
+fi
+exit "$status"
