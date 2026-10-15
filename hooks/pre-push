@@ -24,8 +24,9 @@ tmp=$(mktemp -d) || {
 trap 'rm -rf "$tmp"' EXIT
 tab=$(printf '\t')
 status=0
-# $1 is the remote name git passed to the hook (a URL when pushing by URL).
+# $1 is the remote name, $2 the URL git is actually pushing to.
 remote_name=${1-}
+remote_url=${2-}
 
 fail() {
   echo "pre-push: $1; blocking push (use --no-verify to override)" >&2
@@ -35,6 +36,36 @@ fail() {
 # Every git read below must see the objects the pack will contain.
 git() {
   command git --no-replace-objects "$@"
+}
+
+# Commits to publish when this update has no old tip we can walk from.
+# Do not trust refs/remotes/<name>: a tracking ref can be stale, or can
+# still name commits from a previous URL after `git remote set-url`.
+# Ask the destination itself. Tips we do not have locally are skipped;
+# they cannot hide a commit we are about to send.
+load_remote_tips() {
+  [ -n "$tips_loaded" ] && return 0
+  tips_loaded=1
+  : >"$tmp/exclude"
+  [ -n "$remote_url" ] || return 0
+  if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$remote_url" >"$tmp/tips" 2>"$tmp/lserr"; then
+    fail "cannot see what ${remote_name:-the remote} already has ($(tail -n 1 "$tmp/lserr"))"
+  fi
+  while read -r sha _; do
+    [ -n "$sha" ] || continue
+    git cat-file -e "$sha^{commit}" >/dev/null 2>&1 </dev/null || continue
+    printf '^%s\n' "$sha" >>"$tmp/exclude"
+  done <"$tmp/tips"
+}
+
+list_unpushed() {
+  load_remote_tips
+  {
+    printf '%s\n' "$local_sha"
+    cat "$tmp/exclude"
+  } >"$tmp/revs"
+  git rev-list --stdin <"$tmp/revs" >"$tmp/commits" ||
+    fail "cannot list commits for $local_sha"
 }
 
 # stdin: <local ref> SP <local sha> SP <remote ref> SP <remote sha>
@@ -48,15 +79,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       git cat-file -e "$remote_sha^{commit}" >/dev/null 2>&1 </dev/null; then
       git rev-list "$remote_sha..$local_sha" >"$tmp/commits" </dev/null ||
         fail "cannot list commits $remote_sha..$local_sha"
-    elif [ -n "$remote_name" ]; then
-      # New ref, or a force push whose old tip is not in this clone.
-      # Skip only history already on THIS remote. A secret that exists only
-      # on some other remote is not public here yet.
-      git rev-list "$local_sha" --not --remotes="$remote_name" >"$tmp/commits" </dev/null ||
-        fail "cannot list commits for $local_sha"
     else
-      git rev-list "$local_sha" >"$tmp/commits" </dev/null ||
-        fail "cannot list commits for $local_sha"
+      list_unpushed
     fi
 
     while read -r commit; do

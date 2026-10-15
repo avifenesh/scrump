@@ -437,4 +437,28 @@ git -C "$REPO" replace "$real_blob" "$clean_blob"
 expect_blocked origin main "secret.env"
 ok "replace ref cannot hide a blob"
 
+# --- a local tracking ref is not proof the destination has the commit ---
+new_repo
+git -C "$REPO" remote add origin "$BARE"
+printf 'hello\n' >"$REPO/readme.txt"
+commit_all "base"
+plant_file "secret.env"
+commit_all "leak"
+git -C "$REPO" update-ref refs/remotes/origin/main HEAD
+expect_blocked origin main "secret.env"
+ok "stale tracking ref cannot hide a secret"
+
+new_repo
+git -C "$REPO" remote add origin "$BARE"
+printf 'hello\n' >"$REPO/readme.txt"
+commit_all "base"
+plant_file "secret.env"
+commit_all "leak"
+git -C "$REPO" push --no-verify origin HEAD:refs/heads/main >/dev/null 2>&1 || die "seed push failed"
+empty="$TMP/empty-$n.git"
+git init -q --bare "$empty"
+git -C "$REPO" remote set-url origin "$empty"
+expect_blocked origin main "secret.env"
+ok "changed remote URL is scanned against the new destination"
+
 ok "pre-push hook"
