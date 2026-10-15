@@ -121,6 +121,41 @@ expect_ok() {
   fi
 }
 
+push_spec() {
+  local remote=$1 spec=$2
+  local log="$TMP/push.log"
+  local rc=0
+  git -C "$REPO" push "$remote" "$spec" >"$log" 2>&1 || rc=$?
+  PUSH_RC=$rc
+  PUSH_LOG=$log
+}
+
+expect_spec_blocked() {
+  local remote=$1 spec=$2 needle=$3
+  push_spec "$remote" "$spec"
+  if [[ "$PUSH_RC" -eq 0 ]]; then
+    cat "$PUSH_LOG" >&2
+    die "push $spec was allowed; expected a block ($needle)"
+  fi
+  if ! grep -q "possible secret" "$PUSH_LOG"; then
+    cat "$PUSH_LOG" >&2
+    die "push $spec failed, but not because of a secret"
+  fi
+  if ! grep -F -q "$needle" "$PUSH_LOG"; then
+    cat "$PUSH_LOG" >&2
+    die "block message did not name $needle"
+  fi
+}
+
+expect_spec_ok() {
+  local remote=$1 spec=$2
+  push_spec "$remote" "$spec"
+  if [[ "$PUSH_RC" -ne 0 ]]; then
+    cat "$PUSH_LOG" >&2
+    die "push $spec should have succeeded"
+  fi
+}
+
 # --- clean first push, then a secret at the tip ---
 new_repo
 git -C "$REPO" remote add origin "$BARE"
@@ -345,5 +380,61 @@ set -e
 [[ "$hook_rc" -eq 0 ]] || { cat "$hook_log" >&2; die "missing scrump should allow the push"; }
 grep -q "scrump not installed" "$hook_log" || { cat "$hook_log" >&2; die "missing scrump did not warn"; }
 ok "missing scrump warns and allows"
+
+# --- a ref that does not peel to a commit: blob, tree, annotated tag ---
+new_repo
+git -C "$REPO" remote add origin "$BARE"
+clean_blob="$(printf 'hello\n' | git -C "$REPO" hash-object -w --stdin)"
+expect_spec_ok origin "$clean_blob:refs/tags/clean-blob"
+clean_tree="$(printf '100644 blob %s\tread me.txt\n' "$clean_blob" | git -C "$REPO" mktree)"
+expect_spec_ok origin "$clean_tree:refs/tags/clean-tree"
+ok "clean blob and tree refs pushed"
+sec_blob="$(printf '%s\n' "$TOKEN" | git -C "$REPO" hash-object -w --stdin)"
+expect_spec_blocked origin "$sec_blob:refs/tags/secret-blob" "secret-blob"
+sec_tree="$(printf '100644 blob %s\tmy secret.env\n' "$sec_blob" | git -C "$REPO" mktree)"
+expect_spec_blocked origin "$sec_tree:refs/tags/secret-tree" "my secret.env"
+git -C "$REPO" tag -a -m leak secret-ann "$sec_blob"
+expect_spec_blocked origin "refs/tags/secret-ann" "secret-ann"
+ok "blob, tree and annotated tag of a blob blocked"
+
+# --- annotated tag of a commit still walks history, not just the tip ---
+new_repo
+git -C "$REPO" remote add origin "$BARE"
+printf 'hello\n' >"$REPO/readme.txt"
+commit_all "readme"
+expect_ok origin main
+plant_file "leak.env"
+commit_all "add leak"
+rm "$REPO/leak.env"
+commit_all "remove leak"
+git -C "$REPO" tag -a -m v1 v1
+expect_spec_blocked origin "refs/tags/v1" "leak.env"
+ok "annotated tag of a commit walks history"
+
+# --- a replace ref must not hide the commit or the blob that will be pushed ---
+new_repo
+git -C "$REPO" remote add origin "$BARE"
+printf 'hello\n' >"$REPO/readme.txt"
+commit_all "base"
+plant_file "secret.env"
+commit_all "leak"
+parent="$(git -C "$REPO" rev-parse HEAD~1)"
+leak="$(git -C "$REPO" rev-parse HEAD)"
+clean="$(git -C "$REPO" commit-tree "$(git -C "$REPO" rev-parse "$parent^{tree}")" -p "$parent" -m clean)"
+git -C "$REPO" replace "$leak" "$clean"
+expect_blocked origin main "secret.env"
+ok "replace ref cannot hide a commit"
+
+new_repo
+git -C "$REPO" remote add origin "$BARE"
+printf 'hello\n' >"$REPO/readme.txt"
+commit_all "base"
+plant_file "secret.env"
+commit_all "leak"
+real_blob="$(git -C "$REPO" rev-parse HEAD:secret.env)"
+clean_blob="$(printf 'hello\n' | git -C "$REPO" hash-object -w --stdin)"
+git -C "$REPO" replace "$real_blob" "$clean_blob"
+expect_blocked origin main "secret.env"
+ok "replace ref cannot hide a blob"
 
 ok "pre-push hook"
