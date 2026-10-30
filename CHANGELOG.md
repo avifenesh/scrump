@@ -13,6 +13,22 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--records`: the input is records separated by the ASCII record
+  separator (0x1E), each scanned on its own, so no hit starts in one record
+  and reaches into the next ([agent-sh/tacit#84](https://github.com/agent-sh/tacit/issues/84)).
+  In one stream a quoted value a cut left open, a candidate the filter
+  rejects (`token_url: '…`, `$(vault …)`) or a keyword rule's reach across
+  lines ran into the next record, and the scan resumed past that record's
+  key and kept its secret. The separators are kept and no mask touches
+  them; a text that holds 0x1E itself has to be masked on its own. Records
+  are searched in windows of whole records (each closed at 4 KiB or 32
+  records): a detector scans alone only the record its leftmost match
+  starts in, and no search reads past its window, which is exact for a
+  pattern without a `^`, `$`, `\A` or `\z` anchor; an anchored pattern,
+  and the rest of a window once a match runs past its record, are scanned
+  record by record.
+  `Engine::scan_records`, `Passthrough::open_records` and
+  `scrump_core::RECORD_SEPARATOR` expose it to library users.
 - `--profile text`: the default ruleset plus detectors for secrets in
   human-readable text (agent transcripts, tool output, logs, config):
   `key=value` in every spelling (JSON, escaped JSON, dictionary index,

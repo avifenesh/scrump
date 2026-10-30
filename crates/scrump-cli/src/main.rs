@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use scrump_core::{write_atomic, Dispatcher, Format};
+use scrump_core::{write_atomic, Dispatcher, Format, Hit};
 use scrump_detect::Engine;
+use scrump_format_passthrough::Passthrough;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "Format-aware secret scrubber for capture artifacts")]
@@ -37,6 +38,13 @@ struct Cli {
     /// the hit's length, instead of each rule's own replacement.
     #[arg(long, global = true, value_name = "CHAR", value_parser = parse_mask)]
     mask: Option<char>,
+
+    /// Read the input as records separated by the ASCII record separator
+    /// (0x1E) and scan each record on its own: no hit starts in one record
+    /// and reaches into the next, and the separators are kept. The input is
+    /// plain text, never format-sniffed.
+    #[arg(long, global = true, conflicts_with = "format")]
+    records: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
@@ -118,6 +126,11 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let text = cli.profile == Profile::Text;
+    let input = Input {
+        force: cli.format.as_deref(),
+        text,
+        records: cli.records,
+    };
     let detectors = match (&cli.rules_path, cli.profile) {
         (Some(p), _) => scrump_rules::detectors_from_path(p)
             .with_context(|| format!("loading rules from {}", p.display()))?,
@@ -137,15 +150,7 @@ fn main() -> Result<()> {
             fail_on_hit,
         } => {
             let summary = parse_summary(summary.as_deref())?;
-            let hits = scan(
-                &path,
-                &dispatcher,
-                cli.format.as_deref(),
-                text,
-                &engine,
-                samples,
-                summary,
-            )?;
+            let hits = scan(&path, &dispatcher, input, &engine, samples, summary)?;
             if fail_on_hit && hits > 0 {
                 std::process::exit(EXIT_HITS_FOUND);
             }
@@ -156,8 +161,7 @@ fn main() -> Result<()> {
             out.as_deref(),
             backup,
             &dispatcher,
-            cli.format.as_deref(),
-            text,
+            input,
             &engine,
             // The text profile masks every hit, the default rules' included:
             // NUL bytes have no place in text a person or a model reads next.
@@ -171,12 +175,80 @@ fn is_stream(path: &Path) -> bool {
     path.as_os_str() == "-" || std::fs::metadata(path).is_ok_and(|m| !m.is_file())
 }
 
-fn open(d: &Dispatcher, path: &Path, force: Option<&str>, text: bool) -> Result<Box<dyn Format>> {
+/// How the input is read: a forced format, the text profile (no sniffing),
+/// records mode (one chunk per record, no sniffing).
+#[derive(Clone, Copy)]
+struct Input<'a> {
+    force: Option<&'a str>,
+    text: bool,
+    records: bool,
+}
+
+/// What `open` read: records, scanned record by record, or a format.
+enum Opened {
+    Records(Passthrough),
+    Format(Box<dyn Format>),
+}
+
+impl Opened {
+    fn format(&self) -> &dyn Format {
+        match self {
+            Opened::Records(p) => p,
+            Opened::Format(f) => f.as_ref(),
+        }
+    }
+
+    fn format_mut(&mut self) -> &mut dyn Format {
+        match self {
+            Opened::Records(p) => p,
+            Opened::Format(f) => f.as_mut(),
+        }
+    }
+
+    /// Every hit, with the bytes it covers when they lie in its chunk: a
+    /// format's chunk by chunk as each is scanned, records once all are.
+    fn each_hit<'a>(&'a self, eng: &Engine, mut f: impl FnMut(Hit, Option<&'a [u8]>)) {
+        match self {
+            Opened::Records(p) => {
+                let bytes = p.bytes();
+                for h in eng.scan_records(bytes) {
+                    let start = h.offset as usize;
+                    let end = start + h.len;
+                    f(h, Some(&bytes[start..end]));
+                }
+            }
+            Opened::Format(fmt) => {
+                for chunk in fmt.chunks() {
+                    for h in eng.scan_chunk(&chunk) {
+                        let start = h.offset.saturating_sub(chunk.offset) as usize;
+                        let end = (start + h.len).min(chunk.bytes.len());
+                        let covered = (start < chunk.bytes.len()).then(|| &chunk.bytes[start..end]);
+                        f(h, covered);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn open(d: &Dispatcher, path: &Path, input: Input<'_>) -> Result<Opened> {
+    let Input {
+        force,
+        text,
+        records,
+    } = input;
     // `-`, /dev/stdin, a process substitution or any other pipe can be read
     // once, so read it whole here and sniff the bytes instead of reopening
     // the path. Under the text profile the bytes are text by definition: no
     // format sniffing, which would route a transcript holding `ustar` at
-    // byte 257 to the tar handler.
+    // byte 257 to the tar handler. Records are text too.
+    let plain = |bytes: Vec<u8>, hint: Option<&Path>| -> Result<Opened> {
+        Ok(if records {
+            Opened::Records(Passthrough::open_records(bytes, hint)?)
+        } else {
+            Opened::Format(Box::new(Passthrough::open_bytes(bytes, hint)?))
+        })
+    };
     if is_stream(path) {
         if force.is_some() {
             anyhow::bail!("--format cannot be combined with a stream");
@@ -188,27 +260,25 @@ fn open(d: &Dispatcher, path: &Path, force: Option<&str>, text: bool) -> Result<
         } else {
             bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
         }
-        if text {
-            return Ok(Box::new(
-                scrump_format_passthrough::Passthrough::open_bytes(bytes, None)?,
-            ));
+        if text || records {
+            return plain(bytes, None);
         }
-        return d.open_bytes(bytes, None).context("opening stream");
-    }
-    if text && force.is_none() {
-        let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
-        return Ok(Box::new(
-            scrump_format_passthrough::Passthrough::open_bytes(bytes, Some(path))?,
+        return Ok(Opened::Format(
+            d.open_bytes(bytes, None).context("opening stream")?,
         ));
     }
-    match force {
+    if (text || records) && force.is_none() {
+        let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+        return plain(bytes, Some(path));
+    }
+    Ok(Opened::Format(match force {
         Some(name) => d
             .open_path_with(path, name)
-            .with_context(|| format!("forcing format `{name}` on {}", path.display())),
+            .with_context(|| format!("forcing format `{name}` on {}", path.display()))?,
         None => d
             .open_path(path)
-            .with_context(|| format!("opening {}", path.display())),
-    }
+            .with_context(|| format!("opening {}", path.display()))?,
+    }))
 }
 
 /// `--summary` argument: `all` → no cap, a number → top-N. `None` (flag
@@ -229,47 +299,42 @@ fn parse_summary(arg: Option<&str>) -> Result<usize> {
 fn scan(
     path: &Path,
     d: &Dispatcher,
-    force: Option<&str>,
-    text: bool,
+    input: Input<'_>,
     eng: &Engine,
     samples: Option<usize>,
     summary_top: usize,
 ) -> Result<usize> {
-    let fmt = open(d, path, force, text)?;
-    println!("(format={})", fmt.name());
+    let opened = open(d, path, input)?;
+    println!("(format={})", opened.format().name());
     let mut hit_count = 0usize;
     let cap = samples.unwrap_or(0);
     let mut per_rule_samples: std::collections::BTreeMap<String, (usize, Vec<Vec<u8>>)> =
         std::collections::BTreeMap::new();
     let mut rule_counts: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
-    for chunk in fmt.chunks() {
-        for h in eng.scan_chunk(&chunk) {
-            hit_count += 1;
-            println!(
-                "{}:{:#x}+{} rule={} origin={:?}",
-                path.display(),
-                h.offset,
-                h.len,
-                h.rule_id,
-                h.origin
-            );
-            *rule_counts.entry(h.rule_id.clone()).or_insert(0) += 1;
-            if cap > 0 {
-                let entry = per_rule_samples
-                    .entry(h.rule_id.clone())
-                    .or_insert((0, Vec::new()));
-                entry.0 += 1;
-                if entry.1.len() < cap {
-                    let start = h.offset.saturating_sub(chunk.offset) as usize;
-                    let end = (start + h.len).min(chunk.bytes.len());
-                    if start < chunk.bytes.len() {
-                        entry.1.push(chunk.bytes[start..end].to_vec());
-                    }
+    opened.each_hit(eng, |h, covered| {
+        hit_count += 1;
+        println!(
+            "{}:{:#x}+{} rule={} origin={:?}",
+            path.display(),
+            h.offset,
+            h.len,
+            h.rule_id,
+            h.origin
+        );
+        *rule_counts.entry(h.rule_id.clone()).or_insert(0) += 1;
+        if cap > 0 {
+            let entry = per_rule_samples
+                .entry(h.rule_id.clone())
+                .or_insert((0, Vec::new()));
+            entry.0 += 1;
+            if entry.1.len() < cap {
+                if let Some(b) = covered {
+                    entry.1.push(b.to_vec());
                 }
             }
         }
-    }
+    });
     if hit_count == 0 {
         println!("clean: {} (0 hits)", path.display());
     } else {
@@ -349,14 +414,12 @@ fn render_sample(bytes: &[u8]) -> String {
     out
 }
 
-#[allow(clippy::too_many_arguments)]
 fn scrub(
     path: &Path,
     out: Option<&Path>,
     backup: bool,
     d: &Dispatcher,
-    force: Option<&str>,
-    text: bool,
+    input: Input<'_>,
     eng: &Engine,
     mask: Option<char>,
 ) -> Result<()> {
@@ -373,9 +436,11 @@ fn scrub(
             println!("{line}");
         }
     };
-    let mut fmt = open(d, path, force, text)?;
-    say(format!("(format={})", fmt.name()));
-    let mut hits: Vec<_> = fmt.chunks().flat_map(|c| eng.scan_chunk(&c)).collect();
+    let mut opened = open(d, path, input)?;
+    say(format!("(format={})", opened.format().name()));
+    let mut hits = Vec::new();
+    opened.each_hit(eng, |h, _| hits.push(h));
+    let fmt = opened.format_mut();
     if let Some(c) = mask {
         let mut buf = [0u8; 4];
         let pat = c.encode_utf8(&mut buf).as_bytes().to_vec();

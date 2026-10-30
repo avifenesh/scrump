@@ -3,10 +3,14 @@
 //! Used as the unconditional fallback when no format-specific handler claims
 //! the file. Still useful in its own right for log files, plain-text
 //! captures, and `.env`-style files.
+//!
+//! In records mode ([`Passthrough::open_records`]) the bytes are records
+//! separated by [`RECORD_SEPARATOR`], and each record is its own chunk.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+pub use scrump_core::RECORD_SEPARATOR;
 use scrump_core::{
     apply_hits_in_place, write_atomic, Chunk, ChunkOrigin, Format, Handler, Hit, Result,
 };
@@ -15,6 +19,8 @@ pub struct Passthrough {
     /// Original path, retained for debugging / NestedMember labelling.
     path: Option<PathBuf>,
     bytes: Vec<u8>,
+    /// Records mode: one chunk per record instead of one for the whole input.
+    records: bool,
 }
 
 impl Passthrough {
@@ -25,6 +31,7 @@ impl Passthrough {
         Ok(Self {
             path: Some(path.to_path_buf()),
             bytes,
+            records: false,
         })
     }
 
@@ -32,6 +39,21 @@ impl Passthrough {
         Ok(Self {
             path: hint.map(|p| p.to_path_buf()),
             bytes,
+            records: false,
+        })
+    }
+
+    /// Records mode: `bytes` are records separated by [`RECORD_SEPARATOR`],
+    /// and each record is scanned as its own chunk. A hit cannot start in one
+    /// record and reach into the next, so a match a rule's filter rejects
+    /// never moves another record's scan past its key. The separators lie in
+    /// no chunk, so no redaction touches them: the output holds the same
+    /// records at the same offsets.
+    pub fn open_records(bytes: Vec<u8>, hint: Option<&Path>) -> Result<Self> {
+        Ok(Self {
+            path: hint.map(|p| p.to_path_buf()),
+            bytes,
+            records: true,
         })
     }
 
@@ -46,15 +68,36 @@ impl Passthrough {
 
 impl Format for Passthrough {
     fn name(&self) -> &'static str {
-        "passthrough"
+        if self.records {
+            "records"
+        } else {
+            "passthrough"
+        }
     }
 
     fn chunks<'a>(&'a self) -> Box<dyn Iterator<Item = Chunk<'a>> + 'a> {
-        Box::new(std::iter::once(Chunk {
-            bytes: &self.bytes,
-            offset: 0,
-            origin: ChunkOrigin::Raw,
-        }))
+        if !self.records {
+            return Box::new(std::iter::once(Chunk {
+                bytes: &self.bytes,
+                offset: 0,
+                origin: ChunkOrigin::Raw,
+            }));
+        }
+        let mut offset = 0u64;
+        Box::new(
+            self.bytes
+                .split(|b| *b == RECORD_SEPARATOR)
+                .enumerate()
+                .map(move |(i, bytes)| {
+                    let chunk = Chunk {
+                        bytes,
+                        offset,
+                        origin: ChunkOrigin::Section(format!("record {i}")),
+                    };
+                    offset += bytes.len() as u64 + 1;
+                    chunk
+                }),
+        )
     }
 
     fn apply(&mut self, hits: &[Hit]) -> Result<()> {
@@ -160,6 +203,32 @@ mod tests {
         assert_eq!(&result[4..10], &[0u8; 6]);
         assert_eq!(&result[10..], b" def");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn records_are_chunks_and_separators_are_in_none() {
+        let pt = Passthrough::open_records(b"ab\x1e\x1ecde\x1e".to_vec(), None).unwrap();
+        let chunks: Vec<_> = pt.chunks().collect();
+        let got: Vec<(&[u8], u64)> = chunks.iter().map(|c| (c.bytes, c.offset)).collect();
+        assert_eq!(
+            got,
+            vec![
+                (&b"ab"[..], 0),
+                (&b""[..], 3),
+                (&b"cde"[..], 4),
+                (&b""[..], 8)
+            ]
+        );
+        assert_eq!(chunks[2].origin, ChunkOrigin::Section("record 2".into()));
+        for c in &chunks {
+            assert!(!c.bytes.contains(&RECORD_SEPARATOR));
+            let at = c.offset as usize;
+            assert_eq!(&pt.bytes()[at..at + c.bytes.len()], c.bytes);
+        }
+        assert_eq!(pt.name(), "records");
+        // Without a separator the input is one record, as in passthrough.
+        let one = Passthrough::open_records(b"plain".to_vec(), None).unwrap();
+        assert_eq!(one.chunks().count(), 1);
     }
 
     #[test]

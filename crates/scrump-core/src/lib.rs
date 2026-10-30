@@ -51,6 +51,11 @@ impl ChunkOrigin {
     }
 }
 
+/// The ASCII record separator (0x1E) that ends a record in records mode:
+/// input made of records is scanned record by record, so no hit starts in
+/// one record and reaches into the next.
+pub const RECORD_SEPARATOR: u8 = 0x1e;
+
 /// A region inside the source file that the detection engine should scan.
 #[derive(Debug, Clone)]
 pub struct Chunk<'a> {
