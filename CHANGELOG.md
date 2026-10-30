@@ -6,12 +6,22 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-30
+
 ### Changed
 
 - zip 9. `ZipFile::name()` failures are invalid archives. Building from
   source needs Rust 1.88 (zip 9.0.2's floor).
+- `scrump-format-perf` no longer declares `linux-perf-data`, which no code
+  used. zstd-safe 7.2.4 leaves the tree with it, and with it
+  RUSTSEC-2026-0395 to 0406.
 
 ### Added
+
+- `hooks/pre-push`: a git pre-push hook that scans, with the text profile,
+  every version of every file the pushed commits add or change (and blobs
+  or trees a ref points at), and blocks the push on a hit. It fails closed
+  when git or scrump cannot read what is pushed. See the README.
 
 - `--records`: the input is records separated by the ASCII record
   separator (0x1E), each scanned on its own, so no hit starts in one record
@@ -426,7 +436,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/avifenesh/scrump/releases/tag/v0.2.0
 [0.1.8]: https://github.com/avifenesh/scrump/releases/tag/v0.1.8
 [0.1.7]: https://github.com/avifenesh/scrump/releases/tag/v0.1.7
 [0.1.6]: https://github.com/avifenesh/scrump/releases/tag/v0.1.6
