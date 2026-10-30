@@ -57,7 +57,7 @@ const KV_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
     (
         "text_key_value_secret_dq",
         &KV_DQ,
-        r#""((?:\\.|[^"\\]){4,1000})(?:"|\z)"#,
+        r#""((?:\\.|[^"\\]){4,1000})(?:"|\\?\z)"#,
     ),
     (
         "text_key_value_secret_sq",
@@ -68,7 +68,7 @@ const KV_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
     (
         "text_key_value_secret_esc",
         &KV_ESC,
-        r#"\\"((?:[^"\\]|\\[^"]){4,1000})(?:\\"|\z)"#,
+        r#"\\"((?:[^"\\]|\\[^"]){4,1000})(?:\\"|\\?\z)"#,
     ),
     // bare value: stops at whitespace, quotes, & ; , } and a literal \n
     (
@@ -107,11 +107,14 @@ impl Detector for KeyValueSecret {
     fn replacement(&self) -> Replacement {
         mask()
     }
-    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], _after: &[u8]) -> bool {
+    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+        let Some(value) = open_value(candidate, before, after) else {
+            return false;
+        };
         let Some((key, sep)) = key_before(tail(before)) else {
             return false;
         };
-        value_is_secret(&key, sep, candidate)
+        value_is_secret(&key, sep, value)
     }
 }
 
@@ -183,7 +186,10 @@ impl Detector for FlagSecret {
     fn replacement(&self) -> Replacement {
         mask()
     }
-    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], _after: &[u8]) -> bool {
+    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+        let Some(candidate) = open_value(candidate, before, after) else {
+            return false;
+        };
         // before ends with `--flag `, `--flag=` or `--flag "`.
         let before = tail(before);
         let mut i = before.len();
@@ -266,7 +272,10 @@ impl Detector for DeclarationSecret {
     fn replacement(&self) -> Replacement {
         mask()
     }
-    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], _after: &[u8]) -> bool {
+    fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
+        let Some(candidate) = open_value(candidate, before, after) else {
+            return false;
+        };
         // before ends with `name string = ` or `name: string = ` or `name = `,
         // then an opening quote for the quoted variants.
         let s = String::from_utf8_lossy(tail(before));
@@ -371,6 +380,33 @@ impl Detector for KeyBody {
 }
 
 // ---- shared judgement -------------------------------------------------------
+
+/// The value to judge. A quoted value the end of the text closed (a cut;
+/// it may end in the backslash of an escape) is judged without the
+/// whitespace the cut left at its end, and is no value at all when its
+/// opening quote closes a string, as in `read -p "Password: " pw`: an odd
+/// count of that quote before it on its line. An escaped quote counts for
+/// an escaped one, an unescaped one for a plain one, and an apostrophe
+/// between two letters is no quote.
+fn open_value<'a>(candidate: &'a [u8], before: &[u8], after: &[u8]) -> Option<&'a [u8]> {
+    if !(after.is_empty() || after == b"\\") {
+        return Some(candidate);
+    }
+    let (escaped, quote) = match before {
+        [.., b'\\', b'"'] => (true, b'"'),
+        [.., q @ (b'"' | b'\'')] => (false, *q),
+        _ => return Some(candidate), // a bare value
+    };
+    let line = &before[..before.len() - if escaped { 2 } else { 1 }];
+    let line = &line[line.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1)..];
+    let letter = |i: usize| line.get(i).is_some_and(u8::is_ascii_alphabetic);
+    let quotes = (0..line.len())
+        .filter(|&i| line[i] == quote)
+        .filter(|&i| escaped == (i > 0 && line[i - 1] == b'\\'))
+        .filter(|&i| !(quote == b'\'' && i > 0 && letter(i - 1) && letter(i + 1)))
+        .count();
+    (quotes % 2 == 0).then(|| candidate.trim_ascii_end())
+}
 
 /// The key that ends `before`, with the separator that followed it:
 /// `Environment=API_TOKEN=` gives ("API_TOKEN", '='); `"password": "`
