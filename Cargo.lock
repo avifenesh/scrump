@@ -620,6 +620,7 @@ version = "0.1.8"
 dependencies = [
  "rayon",
  "regex",
+ "regex-syntax",
  "scrump-core",
  "tracing",
 ]
