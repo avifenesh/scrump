@@ -295,6 +295,11 @@ fn a_quoted_value_left_open_is_masked_to_the_end_of_its_text() {
     // (the text up to the value, reversed; what follows the secret; the tail
     // kept unmasked)
     let cases: &[(&str, &str, &str)] = &[
+        // A cut text starts anywhere: here inside a quoted pair, so a quote
+        // stands alone before the value on its line,
+        ("' :drowssap neht ;01 TIMIL 'elur", "", ""),
+        // and here after a line break, with an apostrophe on the line.
+        ("' :drowssap 'snimda eht\nseton deyolped", "", ""),
         ("\":\"drowssap\",\"\\\\:C\":\"htap\"{", "", ""),
         ("' :drowssap", " and so on", ""),
         ("\" :\"drowssap\"{", "", ""),
@@ -315,13 +320,13 @@ fn a_quoted_value_left_open_is_masked_to_the_end_of_its_text() {
         let want = format!("{open}{}{tail}", "*".repeat(secret.len() + rest.len()));
         assert_eq!(scrub(&line), want, "{line:?}");
     }
-    // An open value under a setting or a reference is no secret, a quote
-    // with no key before it opens no value, and a quote that closes a string
-    // (an odd count of it before on its line) opens none either. A reference
-    // or a placeholder stays one with the line break a cut leaves after it.
+    // An open value under a setting or a reference is no secret, and a quote
+    // with no key before it opens no value. A reference or a placeholder
+    // stays one with the line break a cut leaves after it. (A shell prompt
+    // whose label ends in a credential word is masked to the end: a cut text
+    // starts anywhere, so the quotes before a value cannot say it closes a
+    // string.)
     let mut keep: Vec<String> = [
-        "SSAP_BD \" :drowssaP\" p- s- daer",
-        ";)nekot + \" :nekot\"(gol.elosnoc",
         "\nDROWSSAP_BD$\"=DROWSSAP_BD",
         "\n\r}DROWSSAP_BD{$\"=DROWSSAP_BD",
         "\n>ereh-drowssap-ruoy<\" :drowssap",
