@@ -14,7 +14,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 rayon.workspace = true
 tracing.workspace = true
-scrump-core = { path = "../scrump-core", version = "0.1.8" }
+scrump-core = { path = "../scrump-core", version = "0.2.0" }
 
 [lints]
 workspace = true

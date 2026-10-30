@@ -6,13 +6,36 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-30
+
 ### Changed
 
 - zip 9. `ZipFile::name()` failures are invalid archives. Building from
-  source needs Rust 1.88 (zip 9.0.2's floor).
+  source needs Rust 1.88 (zip 9's floor).
+- `scrump-format-perf` no longer declares `linux-perf-data`, which no code
+  used. zstd-safe 7.2.4 leaves the tree with it, and with it
+  RUSTSEC-2026-0395 to 0406.
+- Quarantined after the 2026-07 and 2026-08 TruffleHog refreshes, so they
+  no longer report: the renamed `cloudflareglobalapikey_v1/_v2` and
+  `hashicorpvault_*` rules, both `duo` rules,
+  `cloudflareapitoken_v2__accountidpat`, twelve bare hostname and URL
+  detectors (#23), `microsoftteamswebhook_v2__urlpat` (the curated rule
+  above replaces it) and `newrelicinsightsquerykey__accountidpat` (#28).
+  With them the compat failure floor went from 123 to 99.
 
 ### Added
 
+- `hooks/pre-push`: a git pre-push hook that scans, with the text profile,
+  every version of every file the pushed commits add or change (and blobs
+  or trees a ref points at), and blocks the push on a hit. It fails closed
+  when git or scrump cannot read what is pushed. See the README.
+- `scrump scan` ends with a `top rules:` block, the rules with the most
+  hits, after `found:`; `--summary N|all` sets how many (default 10). A
+  script that reads scan output gets these extra lines (#23).
+- Curated `gitlab_pat` rule for `glpat-` tokens with a 20 to 300 character
+  suffix; the auto-extracted rule stops at 22 (#23).
+- Curated `microsoft_teams_webhook_v2` rule: a Power Automate webhook URL
+  is a finding only with a non-empty `sig` key, as upstream filters (#28).
 - `--records`: the input is records separated by the ASCII record
   separator (0x1E), each scanned on its own, so no hit starts in one record
   and reaches into the next ([agent-sh/tacit#84](https://github.com/agent-sh/tacit/issues/84)).
@@ -47,7 +70,6 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   (length preserving); `--mask CHAR` overrides it; `scrub -o -` streams to
   stdout with status on stderr; `-` and other streams are read once; under
   the text profile input is never format-sniffed.
-
 - `Detector::post_filter_with_context` receives the bytes surrounding the
   selected match in its format chunk. Existing detectors keep their
   candidate-only `post_filter` behavior by default.
@@ -426,7 +448,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/avifenesh/scrump/releases/tag/v0.2.0
 [0.1.8]: https://github.com/avifenesh/scrump/releases/tag/v0.1.8
 [0.1.7]: https://github.com/avifenesh/scrump/releases/tag/v0.1.7
 [0.1.6]: https://github.com/avifenesh/scrump/releases/tag/v0.1.6
