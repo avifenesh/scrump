@@ -108,9 +108,7 @@ impl Detector for KeyValueSecret {
         mask()
     }
     fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
-        let Some(value) = open_value(candidate, before, after) else {
-            return false;
-        };
+        let value = open_value(candidate, after);
         let Some((key, sep)) = key_before(tail(before)) else {
             return false;
         };
@@ -187,9 +185,7 @@ impl Detector for FlagSecret {
         mask()
     }
     fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
-        let Some(candidate) = open_value(candidate, before, after) else {
-            return false;
-        };
+        let candidate = open_value(candidate, after);
         // before ends with `--flag `, `--flag=` or `--flag "`.
         let before = tail(before);
         let mut i = before.len();
@@ -273,9 +269,7 @@ impl Detector for DeclarationSecret {
         mask()
     }
     fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
-        let Some(candidate) = open_value(candidate, before, after) else {
-            return false;
-        };
+        let candidate = open_value(candidate, after);
         // before ends with `name string = ` or `name: string = ` or `name = `,
         // then an opening quote for the quoted variants.
         let s = String::from_utf8_lossy(tail(before));
@@ -381,35 +375,19 @@ impl Detector for KeyBody {
 
 // ---- shared judgement -------------------------------------------------------
 
-/// The value to judge. A quoted value the end of the text closed (a cut;
-/// it may end in the backslash of an escape) is judged without the
-/// whitespace the cut left at its end, and is no value at all when its
-/// opening quote closes a string, as in `read -p "Password: " pw`: an odd
-/// count of that quote before it on its line. An escaped quote (after an
-/// odd run of backslashes) counts for an escaped one, an unescaped one for a
-/// plain one, and an apostrophe between two letters is no quote.
-fn open_value<'a>(candidate: &'a [u8], before: &[u8], after: &[u8]) -> Option<&'a [u8]> {
-    if !(after.is_empty() || after == b"\\") {
-        return Some(candidate);
+/// The value to judge. A value the end of the text closes (a cut; a quoted
+/// one may end in the backslash of an escape) is judged without the
+/// whitespace the cut left at its end. Whether a quoted one's opening quote
+/// closes a string instead (a shell prompt whose label ends in a credential
+/// word and a colon) is not guessed: a cut text starts anywhere, so the
+/// quotes before it on its line say nothing, and a prompt masked to the end
+/// only over-masks.
+fn open_value<'a>(candidate: &'a [u8], after: &[u8]) -> &'a [u8] {
+    if after.is_empty() || after == b"\\" {
+        candidate.trim_ascii_end()
+    } else {
+        candidate
     }
-    let (escaped, quote) = match before {
-        [.., b'\\', b'"'] => (true, b'"'),
-        [.., q @ (b'"' | b'\'')] => (false, *q),
-        _ => return Some(candidate), // a bare value
-    };
-    let line = &before[..before.len() - if escaped { 2 } else { 1 }];
-    let line = &line[line.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1)..];
-    let letter = |i: usize| line.get(i).is_some_and(u8::is_ascii_alphabetic);
-    // A quote is escaped by an odd run of backslashes before it: `\\"` is
-    // an escaped backslash and a plain quote.
-    let escaped_at =
-        |i: usize| line[..i].iter().rev().take_while(|b| **b == b'\\').count() % 2 == 1;
-    let quotes = (0..line.len())
-        .filter(|&i| line[i] == quote)
-        .filter(|&i| escaped == escaped_at(i))
-        .filter(|&i| !(quote == b'\'' && i > 0 && letter(i - 1) && letter(i + 1)))
-        .count();
-    (quotes % 2 == 0).then(|| candidate.trim_ascii_end())
 }
 
 /// The key that ends `before`, with the separator that followed it:

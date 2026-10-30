@@ -41,9 +41,9 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   counts, code and placeholders are kept. A quoted value a cut left open at
   the end of a text (a truncated tool output, a clipped line, one record of
   a batch) is masked to the end, up to 1,000 bytes, a backslash the cut left
-  of an escape kept; it is judged without the whitespace after it, and a
-  quote that closes a string (an odd count of it before it on its line, as
-  in `read -p "Password: " pw`) opens no value. Every hit is masked with `*`
+  of an escape kept; it is judged without the whitespace after it. A cut
+  text starts anywhere, so a shell prompt whose label ends in a credential
+  word is masked to the end too. Every hit is masked with `*`
   (length preserving); `--mask CHAR` overrides it; `scrub -o -` streams to
   stdout with status on stderr; `-` and other streams are read once; under
   the text profile input is never format-sniffed.
