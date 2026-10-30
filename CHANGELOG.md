@@ -38,7 +38,12 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   open private-key blocks and bare base64 key bodies. Post filters read the
   key and the value: credential words decide, setting suffixes
   (`token_url`, `max_tokens`, `tokenizer`), booleans, `$VAR` references,
-  counts, code and placeholders are kept. Every hit is masked with `*`
+  counts, code and placeholders are kept. A quoted value a cut left open at
+  the end of a text (a truncated tool output, a clipped line, one record of
+  a batch) is masked to the end, up to 1,000 bytes, a backslash the cut left
+  of an escape kept; it is judged without the whitespace after it, and a
+  quote that closes a string (an odd count of it before it on its line, as
+  in `read -p "Password: " pw`) opens no value. Every hit is masked with `*`
   (length preserving); `--mask CHAR` overrides it; `scrub -o -` streams to
   stdout with status on stderr; `-` and other streams are read once; under
   the text profile input is never format-sniffed.
