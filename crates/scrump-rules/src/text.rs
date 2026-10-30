@@ -57,14 +57,18 @@ const KV_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
     (
         "text_key_value_secret_dq",
         &KV_DQ,
-        r#""((?:\\.|[^"\\]){4,1000})""#,
+        r#""((?:\\.|[^"\\]){4,1000})(?:"|\z)"#,
     ),
-    ("text_key_value_secret_sq", &KV_SQ, r#"'([^']{4,1000})'"#),
+    (
+        "text_key_value_secret_sq",
+        &KV_SQ,
+        r#"'([^']{4,1000})(?:'|\z)"#,
+    ),
     // \"value\" inside a JSON string holding JSON
     (
         "text_key_value_secret_esc",
         &KV_ESC,
-        r#"\\"((?:[^"\\]|\\[^"]){4,1000})\\""#,
+        r#"\\"((?:[^"\\]|\\[^"]){4,1000})(?:\\"|\z)"#,
     ),
     // bare value: stops at whitespace, quotes, & ; , } and a literal \n
     (
@@ -145,8 +149,8 @@ static FL_SQ: OnceLock<Regex> = OnceLock::new();
 static FL_BARE: OnceLock<Regex> = OnceLock::new();
 
 const FLAG_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
-    ("text_flag_secret_dq", &FL_DQ, r#""([^"]{4,1000})""#),
-    ("text_flag_secret_sq", &FL_SQ, r#"'([^']{4,1000})'"#),
+    ("text_flag_secret_dq", &FL_DQ, r#""([^"]{4,1000})(?:"|\z)"#),
+    ("text_flag_secret_sq", &FL_SQ, r#"'([^']{4,1000})(?:'|\z)"#),
     ("text_flag_secret", &FL_BARE, r#"([^\s'"-][^\s'"]{3,511})"#),
 ];
 
@@ -220,8 +224,16 @@ static DE_SQ: OnceLock<Regex> = OnceLock::new();
 static DE_BARE: OnceLock<Regex> = OnceLock::new();
 
 const DECL_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
-    ("text_declaration_secret_dq", &DE_DQ, r#""([^"]{4,1000})""#),
-    ("text_declaration_secret_sq", &DE_SQ, r#"'([^']{4,1000})'"#),
+    (
+        "text_declaration_secret_dq",
+        &DE_DQ,
+        r#""([^"]{4,1000})(?:"|\z)"#,
+    ),
+    (
+        "text_declaration_secret_sq",
+        &DE_SQ,
+        r#"'([^']{4,1000})(?:'|\z)"#,
+    ),
     ("text_declaration_secret", &DE_BARE, r#"([^\s'",;]{4,512})"#),
 ];
 

@@ -285,6 +285,47 @@ fn text_prose_paths_and_counts_are_kept() {
     }
 }
 
+/// A cut text (a truncated tool output, a clipped line, one record of a
+/// batch) can end inside a credential's quoted value. The end of the text
+/// closes it: the value is masked to the end, as a closing quote would have
+/// it masked.
+#[test]
+fn a_quoted_value_left_open_is_masked_to_the_end_of_its_text() {
+    let secret = rev("88qwLd93kZ");
+    for tpl in [
+        "no os dna }{' :drowssap",
+        "}{\" :\"drowssap\"{",
+        "}{\"\\:\"\\drowssap\"\\",
+        "}{' drowssap--",
+        "}{\" = gnirts drowssap rav",
+        "...}{'=YEK_IPA tropxe",
+    ] {
+        let line = rev(tpl).replace("{}", &secret);
+        let out = scrub(&line);
+        assert!(!out.contains(&secret), "{line:?} -> {out:?}");
+        assert!(out.ends_with("****"), "masked to the end: {out:?}");
+    }
+    // An open value under a setting or a reference is no secret, and a
+    // quote with no key before it opens no value.
+    for line in [
+        format!(
+            "token_url: 'https://auth.example.invalid/oauth/{}",
+            "p".repeat(80)
+        ),
+        "DB_PASSWORD='$(vault read -field=value secret/db".to_string(),
+        "the cut text ends in 'an open quote".to_string(),
+        "max_tokens: \"4096 per call".to_string(),
+    ] {
+        let hits = text_only_engine().scan_chunk(&Chunk {
+            bytes: line.as_bytes(),
+            offset: 0,
+            origin: ChunkOrigin::Raw,
+        });
+        let ids: Vec<_> = hits.iter().map(|h| h.rule_id.as_str()).collect();
+        assert!(hits.is_empty(), "{line:?} over-redacted by {ids:?}");
+    }
+}
+
 #[test]
 fn default_profile_ignores_text_shapes() {
     let engine = Engine::new(scrump_rules::default_detectors().expect("default rules"));

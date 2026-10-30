@@ -54,6 +54,13 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Text profile: a credential's quoted value that a cut left open at the end
+  of a text (a truncated tool output, a clipped line, one record of a batch)
+  is masked to the end of the text. Before, the value needed its closing
+  quote and came back whole; a program that joined texts with a boundary
+  holding quotes masked it, one that scans each text alone did not. An open
+  value under a setting or a reference (`token_url: '…`, `$(vault …)`) is
+  still kept.
 - TruffleHog corpus refresh 2026-10 (upstream `0e42739`): the auto-extracted
   ruleset is re-extracted; GitLab PAT rules (`gitlab_v2__keypat`,
   `gitlab_v3__keypat`, curated `gitlab_pat`) carry TruffleHog's 3.6
