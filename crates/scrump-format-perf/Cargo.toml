@@ -10,7 +10,6 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-linux-perf-data.workspace = true
 byteorder.workspace = true
 scrump-core = { path = "../scrump-core", version = "0.1.8" }
 
