@@ -205,31 +205,28 @@ impl Opened {
         }
     }
 
-    /// Every hit, with the bytes it covers when they lie in its chunk.
-    fn hits<'a>(&'a self, eng: &Engine) -> Vec<(Hit, Option<&'a [u8]>)> {
+    /// Every hit, with the bytes it covers when they lie in its chunk: a
+    /// format's chunk by chunk as each is scanned, records once all are.
+    fn each_hit<'a>(&'a self, eng: &Engine, mut f: impl FnMut(Hit, Option<&'a [u8]>)) {
         match self {
             Opened::Records(p) => {
                 let bytes = p.bytes();
-                eng.scan_records(bytes)
-                    .into_iter()
-                    .map(|h| {
-                        let start = h.offset as usize;
-                        let end = start + h.len;
-                        (h, Some(&bytes[start..end]))
-                    })
-                    .collect()
+                for h in eng.scan_records(bytes) {
+                    let start = h.offset as usize;
+                    let end = start + h.len;
+                    f(h, Some(&bytes[start..end]));
+                }
             }
-            Opened::Format(f) => f
-                .chunks()
-                .flat_map(|chunk| {
-                    eng.scan_chunk(&chunk).into_iter().map(move |h| {
+            Opened::Format(fmt) => {
+                for chunk in fmt.chunks() {
+                    for h in eng.scan_chunk(&chunk) {
                         let start = h.offset.saturating_sub(chunk.offset) as usize;
                         let end = (start + h.len).min(chunk.bytes.len());
                         let covered = (start < chunk.bytes.len()).then(|| &chunk.bytes[start..end]);
-                        (h, covered)
-                    })
-                })
-                .collect(),
+                        f(h, covered);
+                    }
+                }
+            }
         }
     }
 }
@@ -315,7 +312,7 @@ fn scan(
         std::collections::BTreeMap::new();
     let mut rule_counts: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
-    for (h, covered) in opened.hits(eng) {
+    opened.each_hit(eng, |h, covered| {
         hit_count += 1;
         println!(
             "{}:{:#x}+{} rule={} origin={:?}",
@@ -337,7 +334,7 @@ fn scan(
                 }
             }
         }
-    }
+    });
     if hit_count == 0 {
         println!("clean: {} (0 hits)", path.display());
     } else {
@@ -441,7 +438,8 @@ fn scrub(
     };
     let mut opened = open(d, path, input)?;
     say(format!("(format={})", opened.format().name()));
-    let mut hits: Vec<_> = opened.hits(eng).into_iter().map(|(h, _)| h).collect();
+    let mut hits = Vec::new();
+    opened.each_hit(eng, |h, _| hits.push(h));
     let fmt = opened.format_mut();
     if let Some(c) = mask {
         let mut buf = [0u8; 4];

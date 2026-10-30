@@ -73,7 +73,9 @@ scrump --profile text --records scrub - -o -    # records split by 0x1E
 
 `--records` reads the input as records separated by the ASCII record separator (0x1E) and scans each record on its own. A program that redacts many texts in one call joins them with 0x1E and splits the output on it. No hit can start in one text and run into the next. In one stream a quoted value a cut left open, a candidate a rule's filter rejects (`token_url: '…`, `$(vault …)`) or a keyword rule's reach across lines can run into the next text, and the scan resumes past that text's key and keeps its secret. The separators come back where they were and masks keep the length, so the output splits into the same texts. Records are text: the input is never format-sniffed, under any profile.
 
-Each detector first searches the whole input and scans alone only the records a match can start in, so many short records cost about what one stream does. That is exact for a pattern without a `^`, `$`, `\A` or `\z` anchor, because 0x1E, like the end of a text, is no word character; a pattern with an anchor is scanned record by record. Library users have `Engine::scan_records` and `Passthrough::open_records`.
+A text that holds 0x1E itself would become two records: a secret around that byte would not be found, and the output would no longer split into the caller's texts. Mask such a text on its own, without `--records`. `scan` names each hit's record, counted from 0: `origin=Section("record 0")`.
+
+The records are searched in windows of whole records, each closed once it reaches 4 KiB or 32 records: a detector searches each window for its leftmost match and scans alone only the record the match starts in, so many short records cost about what one stream does, and no search reads past its window. That is exact for a pattern without a `^`, `$`, `\A` or `\z` anchor, because 0x1E, like the end of a text, is no word character; a pattern with an anchor, and the rest of a window once a match runs past its record, are scanned record by record. Library users have `Engine::scan_records` and `Passthrough::open_records`.
 
 ## Block secrets before they go public (git pre-push hook)
 

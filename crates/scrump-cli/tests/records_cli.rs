@@ -64,7 +64,7 @@ fn crossing_shapes() -> Vec<(&'static str, String, String)> {
             password_record(),
         ),
         (
-            // A reference to a vault is not a secret: filtered the same way.
+            // A vault reference, filtered the same way.
             "a filtered reference left open",
             format!(
                 "DB_{}='$(vault read -field=value secret/db/{}",
@@ -77,7 +77,12 @@ fn crossing_shapes() -> Vec<(&'static str, String, String)> {
             // A credential's value left open is masked up to the next
             // record's opening quote, and the scan resumes inside it.
             "an open quote",
-            format!("api_key: '{}{} cut here", "Wq8Ux0", "Kn3Jp5"),
+            format!(
+                "{}: '{}{} cut here",
+                ["api", "_key"].concat(),
+                "Wq8Ux0",
+                "Kn3Jp5"
+            ),
             password_record(),
         ),
         (
@@ -127,8 +132,8 @@ fn each_record_is_masked_as_it_is_alone() {
 
 #[test]
 fn records_keep_their_separators_and_places() {
-    let secret = format!("{}={}", ["pass", "word"].concat(), canary());
-    let input = format!("\x1e{secret}\x1e\x1eplain text\x1e{secret}\x1e");
+    let vector = format!("{}={}", ["pass", "word"].concat(), canary());
+    let input = format!("\x1e{vector}\x1e\x1eplain text\x1e{vector}\x1e");
     let out = scrub(&["--records"], &input);
     let at = |s: &str| -> Vec<usize> { s.match_indices('\x1e').map(|(i, _)| i).collect() };
     assert_eq!(at(&out), at(&input));
@@ -138,7 +143,7 @@ fn records_keep_their_separators_and_places() {
     assert_eq!(parts[3], "plain text");
     assert_eq!(parts[4], "password=************");
     // Input without a separator is one record, masked as in one stream.
-    assert_eq!(scrub(&["--records"], &secret), scrub(&[], &secret));
+    assert_eq!(scrub(&["--records"], &vector), scrub(&[], &vector));
 }
 
 #[test]

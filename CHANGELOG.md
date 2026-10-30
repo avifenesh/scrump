@@ -20,10 +20,14 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   rejects (`token_url: '…`, `$(vault …)`) or a keyword rule's reach across
   lines ran into the next record, and the scan resumed past that record's
   key and kept its secret. The separators are kept and no mask touches
-  them. Each detector searches the whole input first and scans alone only
-  the records a match can start in, which is exact for a pattern without a
-  `^`, `$`, `\A` or `\z` anchor; an anchored pattern is scanned record by
-  record. `Engine::scan_records`, `Passthrough::open_records` and
+  them; a text that holds 0x1E itself has to be masked on its own. Records
+  are searched in windows of whole records (each closed at 4 KiB or 32
+  records): a detector scans alone only the record its leftmost match
+  starts in, and no search reads past its window, which is exact for a
+  pattern without a `^`, `$`, `\A` or `\z` anchor; an anchored pattern,
+  and the rest of a window once a match runs past its record, are scanned
+  record by record.
+  `Engine::scan_records`, `Passthrough::open_records` and
   `scrump_core::RECORD_SEPARATOR` expose it to library users.
 - `--profile text`: the default ruleset plus detectors for secrets in
   human-readable text (agent transcripts, tool output, logs, config):
