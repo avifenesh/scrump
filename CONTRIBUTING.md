@@ -30,7 +30,9 @@ logs, config), where `password: swordfish` and `Environment=API_TOKEN=…`
 are the secrets that matter and the binary-noise gate does not apply.
 Under the text profile every hit, the default rules' included, is masked
 with `*` rather than zero-filled; `--mask CHAR` picks another character, and
-`scrub -o -` streams to stdout with status on stderr.
+`scrub -o -` streams to stdout with status on stderr. `--records` scans each
+0x1E-separated record on its own; `crates/scrump-rules/tests/records.rs`
+checks that it finds exactly what each record alone finds.
 
 A text-profile change must keep `tests/text_profile.rs` green on both sides:
 every secret vector masked, every prose, path and count line unchanged.

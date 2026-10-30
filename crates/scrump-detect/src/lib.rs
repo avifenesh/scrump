@@ -5,16 +5,25 @@
 //! large files, callers should hand chunks to [`Engine::scan_chunks_par`]
 //! which parallelises across `rayon`'s default pool.
 
+use std::sync::OnceLock;
+
 use rayon::prelude::*;
-use scrump_core::{shannon_entropy, Chunk, Detector, Hit};
+use regex::bytes::Regex;
+use scrump_core::{shannon_entropy, Chunk, ChunkOrigin, Detector, Hit, RECORD_SEPARATOR};
 
 pub struct Engine {
     detectors: Vec<Box<dyn Detector>>,
+    /// Per detector, whether its pattern holds an anchor (`has_anchor`),
+    /// worked out on the first records scan.
+    anchored: OnceLock<Vec<bool>>,
 }
 
 impl Engine {
     pub fn new(detectors: Vec<Box<dyn Detector>>) -> Self {
-        Self { detectors }
+        Self {
+            detectors,
+            anchored: OnceLock::new(),
+        }
     }
 
     pub fn detectors(&self) -> &[Box<dyn Detector>] {
@@ -25,58 +34,64 @@ impl Engine {
     pub fn scan_chunk(&self, chunk: &Chunk<'_>) -> Vec<Hit> {
         let mut hits = Vec::new();
         for det in &self.detectors {
-            match det.capture_index() {
-                Some(ci) => {
-                    for caps in det.pattern().captures_iter(chunk.bytes) {
-                        let Some(m) = caps.get(ci) else { continue };
-                        let matched = &chunk.bytes[m.start()..m.end()];
-                        if let Some(min) = det.min_entropy() {
-                            if shannon_entropy(matched) < min {
-                                continue;
-                            }
-                        }
-                        if !det.post_filter_with_context(
-                            matched,
-                            &chunk.bytes[..m.start()],
-                            &chunk.bytes[m.end()..],
-                        ) {
-                            continue;
-                        }
-                        hits.push(Hit {
-                            offset: chunk.offset + m.start() as u64,
-                            len: m.end() - m.start(),
-                            rule_id: det.id().to_string(),
-                            verified: None,
-                            replacement: det.replacement(),
-                            origin: chunk.origin.clone(),
-                        });
-                    }
+            scan_with(det.as_ref(), chunk, &mut hits);
+        }
+        hits
+    }
+
+    /// Scan `bytes` as records separated by [`RECORD_SEPARATOR`], each on
+    /// its own: the hits are those of [`Engine::scan_chunk`] on every record
+    /// as a chunk of its own (offsets in `bytes`, origin `record N`), so no
+    /// hit starts in one record and reaches into the next.
+    ///
+    /// A regex call per detector per record makes many short records slow
+    /// (about 0.1 ms a record with the text profile's thousand rules), so
+    /// each detector first searches `bytes` whole and only the records a
+    /// match can start in are scanned alone.
+    /// That is exact for a pattern without a line or text anchor: a match a
+    /// record holds alone is also a match at the same place in `bytes`,
+    /// because the separator, like the end of a text, is no word character
+    /// (`\b` reads the same), and the leftmost match in `bytes` starts at or
+    /// before it. A pattern with an anchor (`^`, `$`, `\A`, `\z`) is scanned
+    /// record by record.
+    pub fn scan_records(&self, bytes: &[u8]) -> Vec<Hit> {
+        let records = record_spans(bytes);
+        let chunk = |i: usize| {
+            let (start, end) = records[i];
+            Chunk {
+                bytes: &bytes[start..end],
+                offset: start as u64,
+                origin: ChunkOrigin::Section(format!("record {i}")),
+            }
+        };
+        let anchored = self.anchored.get_or_init(|| {
+            self.detectors
+                .iter()
+                .map(|d| has_anchor(d.pattern()))
+                .collect()
+        });
+        let mut hits = Vec::new();
+        for (det, &anchored) in self.detectors.iter().zip(anchored) {
+            let det = det.as_ref();
+            if anchored {
+                for i in 0..records.len() {
+                    scan_with(det, &chunk(i), &mut hits);
                 }
-                None => {
-                    for m in det.pattern().find_iter(chunk.bytes) {
-                        let matched = &chunk.bytes[m.start()..m.end()];
-                        if let Some(min) = det.min_entropy() {
-                            if shannon_entropy(matched) < min {
-                                continue;
-                            }
-                        }
-                        if !det.post_filter_with_context(
-                            matched,
-                            &chunk.bytes[..m.start()],
-                            &chunk.bytes[m.end()..],
-                        ) {
-                            continue;
-                        }
-                        hits.push(Hit {
-                            offset: chunk.offset + m.start() as u64,
-                            len: m.end() - m.start(),
-                            rule_id: det.id().to_string(),
-                            verified: None,
-                            replacement: det.replacement(),
-                            origin: chunk.origin.clone(),
-                        });
-                    }
+                continue;
+            }
+            let mut i = 0;
+            while i < records.len() {
+                let Some(m) = det.pattern().find_at(bytes, records[i].0) else {
+                    break;
+                };
+                // The first record that ends at or after the match's start: a
+                // match there alone cannot start before it.
+                i += records[i..].partition_point(|&(_, end)| end < m.start());
+                if i >= records.len() {
+                    break;
                 }
+                scan_with(det, &chunk(i), &mut hits);
+                i += 1;
             }
         }
         hits
@@ -92,6 +107,69 @@ impl Engine {
             .flat_map(|c| self.scan_chunk(&c))
             .collect()
     }
+}
+
+/// One detector's hits in one chunk, the context its filter reads bounded
+/// by the chunk.
+fn scan_with(det: &dyn Detector, chunk: &Chunk<'_>, hits: &mut Vec<Hit>) {
+    let mut keep = |start: usize, end: usize| {
+        let matched = &chunk.bytes[start..end];
+        if let Some(min) = det.min_entropy() {
+            if shannon_entropy(matched) < min {
+                return;
+            }
+        }
+        if !det.post_filter_with_context(matched, &chunk.bytes[..start], &chunk.bytes[end..]) {
+            return;
+        }
+        hits.push(Hit {
+            offset: chunk.offset + start as u64,
+            len: end - start,
+            rule_id: det.id().to_string(),
+            verified: None,
+            replacement: det.replacement(),
+            origin: chunk.origin.clone(),
+        });
+    };
+    match det.capture_index() {
+        Some(ci) => {
+            for caps in det.pattern().captures_iter(chunk.bytes) {
+                if let Some(m) = caps.get(ci) {
+                    keep(m.start(), m.end());
+                }
+            }
+        }
+        None => {
+            for m in det.pattern().find_iter(chunk.bytes) {
+                keep(m.start(), m.end());
+            }
+        }
+    }
+}
+
+/// The records of `bytes`: the spans between separators, the last one
+/// running to the end. Empty input is one empty record.
+fn record_spans(bytes: &[u8]) -> Vec<(usize, usize)> {
+    let mut spans = Vec::new();
+    let mut start = 0;
+    for (i, b) in bytes.iter().enumerate() {
+        if *b == RECORD_SEPARATOR {
+            spans.push((start, i));
+            start = i + 1;
+        }
+    }
+    spans.push((start, bytes.len()));
+    spans
+}
+
+/// Does the pattern hold a line or text anchor? One it cannot be parsed
+/// back from counts as anchored: it is then scanned record by record.
+fn has_anchor(re: &Regex) -> bool {
+    regex_syntax::ParserBuilder::new()
+        .utf8(false)
+        .build()
+        .parse(re.as_str())
+        .map_or(true, |hir| hir.properties().look_set().contains_anchor())
 }
 
 #[cfg(test)]
