@@ -285,6 +285,70 @@ fn text_prose_paths_and_counts_are_kept() {
     }
 }
 
+/// A cut text (a truncated tool output, a clipped line, one record of a
+/// batch) can end inside a credential's quoted value. The end of the text
+/// closes it: the value is masked to the end, as a closing quote would have
+/// it masked, a backslash a cut left of an escape kept.
+#[test]
+fn a_quoted_value_left_open_is_masked_to_the_end_of_its_text() {
+    let secret = rev("88qwLd93kZ");
+    // (the text up to the value, reversed; what follows the secret; the tail
+    // kept unmasked)
+    let cases: &[(&str, &str, &str)] = &[
+        ("\":\"drowssap\",\"\\\\:C\":\"htap\"{", "", ""),
+        ("' :drowssap", " and so on", ""),
+        ("\" :\"drowssap\"{", "", ""),
+        ("\" :\"drowssap\"{", "", "\\"),
+        ("\"\\:\"\\drowssap\"\\{", "", ""),
+        ("\"\\:\"\\drowssap\"\\{", "", "\\"),
+        ("' drowssap--", "", ""),
+        ("\" drowssap--", "", ""),
+        ("\" = gnirts drowssap rav", "", ""),
+        ("' = nekot tsnoc", "", ""),
+        ("'=YEK_IPA tropxe", "...", ""),
+        ("' :drowssap s'revres eht", "", ""),
+        ("'=YEK_IPA tropxe\":\"dnammoc\"{", "", ""),
+    ];
+    for (open, rest, tail) in cases {
+        let open = rev(open);
+        let line = format!("{open}{secret}{rest}{tail}");
+        let want = format!("{open}{}{tail}", "*".repeat(secret.len() + rest.len()));
+        assert_eq!(scrub(&line), want, "{line:?}");
+    }
+    // An open value under a setting or a reference is no secret, a quote
+    // with no key before it opens no value, and a quote that closes a string
+    // (an odd count of it before on its line) opens none either. A reference
+    // or a placeholder stays one with the line break a cut leaves after it.
+    let mut keep: Vec<String> = [
+        "SSAP_BD \" :drowssaP\" p- s- daer",
+        ";)nekot + \" :nekot\"(gol.elosnoc",
+        "\nDROWSSAP_BD$\"=DROWSSAP_BD",
+        "\n\r}DROWSSAP_BD{$\"=DROWSSAP_BD",
+        "\n>ereh-drowssap-ruoy<\" :drowssap",
+    ]
+    .iter()
+    .map(|l| rev(l))
+    .collect();
+    keep.extend([
+        format!(
+            "token_url: 'https://auth.example.invalid/oauth/{}",
+            "p".repeat(80)
+        ),
+        "DB_PASSWORD='$(vault read -field=value secret/db".to_string(),
+        "the cut text ends in 'an open quote".to_string(),
+        "max_tokens: \"4096 per call".to_string(),
+    ]);
+    for line in keep {
+        let hits = text_only_engine().scan_chunk(&Chunk {
+            bytes: line.as_bytes(),
+            offset: 0,
+            origin: ChunkOrigin::Raw,
+        });
+        let ids: Vec<_> = hits.iter().map(|h| h.rule_id.as_str()).collect();
+        assert!(hits.is_empty(), "{line:?} over-redacted by {ids:?}");
+    }
+}
+
 #[test]
 fn default_profile_ignores_text_shapes() {
     let engine = Engine::new(scrump_rules::default_detectors().expect("default rules"));
