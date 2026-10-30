@@ -295,6 +295,7 @@ fn a_quoted_value_left_open_is_masked_to_the_end_of_its_text() {
     // (the text up to the value, reversed; what follows the secret; the tail
     // kept unmasked)
     let cases: &[(&str, &str, &str)] = &[
+        ("\":\"drowssap\",\"\\\\:C\":\"htap\"{", "", ""),
         ("' :drowssap", " and so on", ""),
         ("\" :\"drowssap\"{", "", ""),
         ("\" :\"drowssap\"{", "", "\\"),

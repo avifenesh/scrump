@@ -385,9 +385,9 @@ impl Detector for KeyBody {
 /// it may end in the backslash of an escape) is judged without the
 /// whitespace the cut left at its end, and is no value at all when its
 /// opening quote closes a string, as in `read -p "Password: " pw`: an odd
-/// count of that quote before it on its line. An escaped quote counts for
-/// an escaped one, an unescaped one for a plain one, and an apostrophe
-/// between two letters is no quote.
+/// count of that quote before it on its line. An escaped quote (after an
+/// odd run of backslashes) counts for an escaped one, an unescaped one for a
+/// plain one, and an apostrophe between two letters is no quote.
 fn open_value<'a>(candidate: &'a [u8], before: &[u8], after: &[u8]) -> Option<&'a [u8]> {
     if !(after.is_empty() || after == b"\\") {
         return Some(candidate);
@@ -400,9 +400,13 @@ fn open_value<'a>(candidate: &'a [u8], before: &[u8], after: &[u8]) -> Option<&'
     let line = &before[..before.len() - if escaped { 2 } else { 1 }];
     let line = &line[line.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1)..];
     let letter = |i: usize| line.get(i).is_some_and(u8::is_ascii_alphabetic);
+    // A quote is escaped by an odd run of backslashes before it: `\\"` is
+    // an escaped backslash and a plain quote.
+    let escaped_at =
+        |i: usize| line[..i].iter().rev().take_while(|b| **b == b'\\').count() % 2 == 1;
     let quotes = (0..line.len())
         .filter(|&i| line[i] == quote)
-        .filter(|&i| escaped == (i > 0 && line[i - 1] == b'\\'))
+        .filter(|&i| escaped == escaped_at(i))
         .filter(|&i| !(quote == b'\'' && i > 0 && letter(i - 1) && letter(i + 1)))
         .count();
     (quotes % 2 == 0).then(|| candidate.trim_ascii_end())
