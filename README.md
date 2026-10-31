@@ -56,9 +56,9 @@ Every release ships pre-built binaries for:
 | `aarch64-unknown-linux-gnu` | `.tar.gz` (cross-compiled) |
 | `x86_64-unknown-linux-musl` | `.tar.gz` (cross-compiled) |
 | `aarch64-apple-darwin`      | `.tar.gz` |
-| `x86_64-apple-darwin`       | `.tar.gz` |
+| `x86_64-apple-darwin`       | `.tar.gz` (cross-compiled) |
 | `x86_64-pc-windows-msvc`    | `.zip` |
-| `aarch64-pc-windows-msvc`   | `.zip` |
+| `aarch64-pc-windows-msvc`   | `.zip` (cross-compiled) |
 
 ## Use
 
@@ -117,8 +117,8 @@ Three parts:
 3. **Hand-coded** detectors for things regex can't express alone —
    `JwtHsAware` which base64-decodes the JWT header and
    rejects HMAC-signed tokens, mirroring TruffleHog's filtering, and two
-   Okta detectors that need a tenant domain or client id next to the
-   secret. The `text` profile adds key=value, flag, declaration, auth
+   Okta detectors that need a tenant domain next to the secret (and a
+   client id for the OAuth client secret). The `text` profile adds key=value, flag, declaration, auth
    header and key-body detectors (`crates/scrump-rules/src/text.rs`).
 
 The engine supports `capture_index` for keyword-proximity patterns (e.g.
