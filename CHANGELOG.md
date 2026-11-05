@@ -28,8 +28,9 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - The text profile's rule tables are statics, so the crate builds on its
-  declared Rust version again (Rust 1.89 refused the consts that held
-  their `OnceLock` cells). CI checks the declared version.
+  declared Rust version (Rust 1.88 and 1.89 refused the consts that held
+  their `OnceLock` cells, so 0.2.0 did not build on 1.88). CI checks the
+  declared version.
 
 ## [0.2.0] - 2026-10-30
 
