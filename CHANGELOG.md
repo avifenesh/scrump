@@ -22,7 +22,14 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   the ungated one.
 - `Detector` has two methods with defaults, `keywords` and `anchored`.
   Wrappers should forward them; one that does not loses only the speed-up.
-- rusqlite 0.41 and zip 9.1 (#51, #52).
+- rusqlite 0.41 and zip 9.2 (#51, #52). Building from source needs Rust
+  1.89 (rusqlite 0.41's floor).
+
+### Fixed
+
+- The text profile's rule tables are statics, so the crate builds on its
+  declared Rust version again (Rust 1.89 refused the consts that held
+  their `OnceLock` cells). CI checks the declared version.
 
 ## [0.2.0] - 2026-10-30
 

@@ -17,7 +17,7 @@ opens in Nsight Systems; the redacted SQLite still passes `sqlite3
 
 [![CI](https://github.com/avifenesh/scrump/actions/workflows/ci.yml/badge.svg)](https://github.com/avifenesh/scrump/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Rust: 1.88+](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust: 1.89+](https://img.shields.io/badge/rust-1.89%2B-orange.svg)](https://www.rust-lang.org)
 [![GitHub release](https://img.shields.io/github/v/release/avifenesh/scrump?include_prereleases&sort=semver)](https://github.com/avifenesh/scrump/releases)
 
 ## Formats
@@ -37,7 +37,7 @@ opens in Nsight Systems; the redacted SQLite still passes `sqlite3
 ## Install
 
 ```sh
-# From crates.io (Rust 1.88+)
+# From crates.io (Rust 1.89+)
 cargo install scrump-cli
 
 # From source

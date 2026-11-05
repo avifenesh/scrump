@@ -37,6 +37,23 @@ jobs:
           RUSTDOCFLAGS: "-D warnings"
         run: cargo doc --workspace --no-deps --document-private-items
 
+  # The declared rust-version still builds. `+1.89` overrides the stable
+  # pin in rust-toolchain.toml; keep it equal to `rust-version` in
+  # Cargo.toml. Lints are the stable job's: warnings do not fail this one.
+  msrv:
+    name: msrv (rust-version builds)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.89"
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check on rust-version
+        run: cargo +1.89 check --locked --workspace --all-targets
+
   # ------------------------------------------------------------------
   # 2. End-to-end phase gates (0 — 7)
   # ------------------------------------------------------------------

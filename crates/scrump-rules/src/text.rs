@@ -52,7 +52,7 @@ static KV_SQ: OnceLock<Regex> = OnceLock::new();
 static KV_ESC: OnceLock<Regex> = OnceLock::new();
 static KV_BARE: OnceLock<Regex> = OnceLock::new();
 
-const KV_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
+static KV_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
     // "value" with escapes kept whole
     (
         "text_key_value_secret_dq",
@@ -149,7 +149,7 @@ static FL_DQ: OnceLock<Regex> = OnceLock::new();
 static FL_SQ: OnceLock<Regex> = OnceLock::new();
 static FL_BARE: OnceLock<Regex> = OnceLock::new();
 
-const FLAG_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
+static FLAG_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
     ("text_flag_secret_dq", &FL_DQ, r#""([^"]{4,1000})(?:"|\z)"#),
     ("text_flag_secret_sq", &FL_SQ, r#"'([^']{4,1000})(?:'|\z)"#),
     ("text_flag_secret", &FL_BARE, r#"([^\s'"-][^\s'"]{3,511})"#),
@@ -225,7 +225,7 @@ static DE_DQ: OnceLock<Regex> = OnceLock::new();
 static DE_SQ: OnceLock<Regex> = OnceLock::new();
 static DE_BARE: OnceLock<Regex> = OnceLock::new();
 
-const DECL_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
+static DECL_VARIANTS: &[(&str, &OnceLock<Regex>, &str)] = &[
     (
         "text_declaration_secret_dq",
         &DE_DQ,
