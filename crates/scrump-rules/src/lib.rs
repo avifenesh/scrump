@@ -12,9 +12,30 @@ use serde::Deserialize;
 mod metadata;
 pub mod text;
 
+#[cfg(test)]
 const DEFAULT_RULES_YAML: &str = include_str!("../rules/default.yaml");
+#[cfg(test)]
 const TRUFFLEHOG_RULES_YAML: &str = include_str!("../rules/trufflehog.yaml");
+#[cfg(test)]
 const TEXT_RULES_YAML: &str = include_str!("../rules/text.yaml");
+
+/// A rule of an embedded rule file, as `build.rs` read it: the YAML fields
+/// plus what the engine needs before compiling the pattern.
+pub(crate) struct EmbeddedRule {
+    id: &'static str,
+    pattern: &'static str,
+    min_entropy: Option<f64>,
+    capture_index: Option<usize>,
+    /// Prefilter keywords ([`Detector::keywords`]); `None` runs the rule on
+    /// every chunk.
+    keywords: Option<&'static [&'static [u8]]>,
+    anchored: bool,
+}
+
+mod embedded {
+    use super::EmbeddedRule;
+    include!(concat!(env!("OUT_DIR"), "/embedded_rules.rs"));
+}
 
 /// Auto-extracted TruffleHog rules whose patterns produce unusable noise on
 /// real artifacts (issue #9). Each entry was added based on an empirical
@@ -393,17 +414,13 @@ fn structural_quarantine() -> &'static std::collections::HashSet<String> {
     SET.get_or_init(|| {
         let noisy_providers: std::collections::HashSet<&str> =
             TH_QUARANTINE.iter().map(|id| provider_of(id)).collect();
-        let file: RulesFile = match serde_yaml::from_str(TRUFFLEHOG_RULES_YAML) {
-            Ok(f) => f,
-            Err(_) => return std::collections::HashSet::new(),
-        };
-        file.rules
-            .into_iter()
+        embedded::TRUFFLEHOG
+            .iter()
             .filter(|r| {
-                noisy_providers.contains(provider_of(&r.id))
-                    && pattern_is_structurally_noisy(&r.id, &r.pattern)
+                noisy_providers.contains(provider_of(r.id))
+                    && pattern_is_structurally_noisy(r.id, r.pattern)
             })
-            .map(|r| r.id)
+            .map(|r| r.id.to_string())
             .collect()
     })
 }
@@ -538,6 +555,58 @@ impl YamlDetector {
     }
 }
 
+/// A rule of an embedded file. Its pattern is compiled on first use, and the
+/// engine uses it only on text that holds one of its keywords, so a run
+/// compiles only the rules its input can match.
+struct EmbeddedDetector {
+    rule: &'static EmbeddedRule,
+    pattern: std::sync::OnceLock<Regex>,
+}
+
+impl EmbeddedDetector {
+    fn new(rule: &'static EmbeddedRule) -> Self {
+        Self {
+            rule,
+            pattern: std::sync::OnceLock::new(),
+        }
+    }
+}
+
+impl Detector for EmbeddedDetector {
+    fn id(&self) -> &str {
+        self.rule.id
+    }
+    fn pattern(&self) -> &Regex {
+        self.pattern.get_or_init(|| {
+            // build.rs compiled every embedded pattern with this same crate.
+            Regex::new(self.rule.pattern).expect("embedded rule compiled at build time")
+        })
+    }
+    fn min_entropy(&self) -> Option<f64> {
+        self.rule.min_entropy
+    }
+    fn capture_index(&self) -> Option<usize> {
+        self.rule.capture_index
+    }
+    fn keywords(&self) -> Option<&[&[u8]]> {
+        self.rule.keywords
+    }
+    fn anchored(&self) -> Option<bool> {
+        Some(self.rule.anchored)
+    }
+}
+
+fn embedded_detectors(
+    rules: &'static [EmbeddedRule],
+    keep: impl Fn(&str) -> bool,
+) -> Vec<Box<dyn Detector>> {
+    rules
+        .iter()
+        .filter(|r| keep(r.id))
+        .map(|r| Box::new(EmbeddedDetector::new(r)) as Box<dyn Detector>)
+        .collect()
+}
+
 impl Detector for YamlDetector {
     fn id(&self) -> &str {
         &self.id
@@ -557,9 +626,8 @@ impl Detector for YamlDetector {
 /// auto-extracted TruffleHog mirror minus the quarantined-for-noise rules
 /// + hand-coded detectors that need post-pattern logic regex can't express).
 pub fn default_detectors() -> Result<Vec<Box<dyn Detector>>> {
-    let mut all = parse_yaml(DEFAULT_RULES_YAML)?;
-    let th = parse_yaml_filtered(TRUFFLEHOG_RULES_YAML, rule_is_active)?;
-    all.extend(th);
+    let mut all = embedded_detectors(embedded::DEFAULT, |_| true);
+    all.extend(embedded_detectors(embedded::TRUFFLEHOG, rule_is_active));
 
     // Replace every JWT pattern with our HMAC-aware detector. Both the
     // curated `jwt_token` and the auto-extracted `jwt__keypat` are dropped.
@@ -637,6 +705,12 @@ mod custom {
         fn post_filter_with_context(&self, candidate: &[u8], before: &[u8], after: &[u8]) -> bool {
             self.inner
                 .post_filter_with_context(candidate, before, after)
+        }
+        fn keywords(&self) -> Option<&[&[u8]]> {
+            self.inner.keywords()
+        }
+        fn anchored(&self) -> Option<bool> {
+            self.inner.anchored()
         }
     }
 
@@ -813,22 +887,13 @@ pub fn text_detectors() -> Result<Vec<Box<dyn Detector>>> {
 
 /// Only the detectors the text profile adds on top of the default ruleset.
 pub fn text_profile_detectors() -> Result<Vec<Box<dyn Detector>>> {
-    let mut v = parse_yaml_masked(TEXT_RULES_YAML)?;
+    // The text rules' hits are masked with `*` instead of zero-filled.
+    let mut v: Vec<Box<dyn Detector>> = embedded_detectors(embedded::TEXT, |_| true)
+        .into_iter()
+        .map(|d| Box::new(Masked(d)) as Box<dyn Detector>)
+        .collect();
     v.extend(text::detectors());
     Ok(v)
-}
-
-/// Parse YAML rules whose hits are masked with `*` instead of zero-filled.
-fn parse_yaml_masked(s: &str) -> Result<Vec<Box<dyn Detector>>> {
-    let file: RulesFile =
-        serde_yaml::from_str(s).map_err(|e| ScrumpError::Other(format!("yaml parse: {e}")))?;
-    file.rules
-        .into_iter()
-        .map(|def| {
-            YamlDetector::from_def(def)
-                .map(|d| Box::new(Masked(Box::new(d) as Box<dyn Detector>)) as Box<dyn Detector>)
-        })
-        .collect()
 }
 
 /// A detector whose replacement is a printable mask.
@@ -856,6 +921,12 @@ impl Detector for Masked {
     fn verify(&self, candidate: &[u8]) -> scrump_core::VerifyResult {
         self.0.verify(candidate)
     }
+    fn keywords(&self) -> Option<&[&[u8]]> {
+        self.0.keywords()
+    }
+    fn anchored(&self) -> Option<bool> {
+        self.0.anchored()
+    }
 }
 
 /// Load detectors from a YAML file on disk.
@@ -864,18 +935,13 @@ pub fn detectors_from_path(p: &Path) -> Result<Vec<Box<dyn Detector>>> {
     parse_yaml(&s)
 }
 
+/// Parse a YAML ruleset from a user's file. Every pattern is compiled here,
+/// so a bad one fails the load.
 fn parse_yaml(s: &str) -> Result<Vec<Box<dyn Detector>>> {
-    parse_yaml_filtered(s, |_| true)
-}
-
-/// Parse a YAML ruleset, retaining only rules whose id satisfies `keep`.
-/// Used to drop quarantined rules from the auto-extracted TruffleHog set.
-fn parse_yaml_filtered(s: &str, keep: impl Fn(&str) -> bool) -> Result<Vec<Box<dyn Detector>>> {
     let file: RulesFile =
         serde_yaml::from_str(s).map_err(|e| ScrumpError::Other(format!("yaml parse: {e}")))?;
     file.rules
         .into_iter()
-        .filter(|d| keep(&d.id))
         .map(|d| YamlDetector::from_def(d).map(|x| Box::new(x) as Box<dyn Detector>))
         .collect()
 }
@@ -894,6 +960,30 @@ mod tests {
             ids.contains(&"github_pat_classic"),
             "missing github_pat_classic in default ruleset: {ids:?}"
         );
+    }
+
+    #[test]
+    fn embedded_tables_are_the_yaml_files() {
+        for (yaml, table) in [
+            (DEFAULT_RULES_YAML, embedded::DEFAULT),
+            (TRUFFLEHOG_RULES_YAML, embedded::TRUFFLEHOG),
+            (TEXT_RULES_YAML, embedded::TEXT),
+        ] {
+            let file: RulesFile = serde_yaml::from_str(yaml).unwrap();
+            assert_eq!(file.rules.len(), table.len());
+            for (def, rule) in file.rules.iter().zip(table) {
+                assert_eq!(def.id, rule.id);
+                assert_eq!(def.pattern, rule.pattern);
+                assert_eq!(
+                    def.min_entropy.map(f64::to_bits),
+                    rule.min_entropy.map(f64::to_bits)
+                );
+                assert_eq!(def.capture_index, rule.capture_index);
+                // The engine's own reading of the compiled pattern.
+                let re = Regex::new(rule.pattern).unwrap();
+                assert_eq!(re.as_str(), rule.pattern);
+            }
+        }
     }
 
     #[test]

@@ -5,8 +5,10 @@
 //! large files, callers should hand chunks to [`Engine::scan_chunks_par`]
 //! which parallelises across `rayon`'s default pool.
 
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use aho_corasick::{AhoCorasick, MatchKind};
 use rayon::prelude::*;
 use regex::bytes::Regex;
 use scrump_core::{shannon_entropy, Chunk, ChunkOrigin, Detector, Hit, RECORD_SEPARATOR};
@@ -16,6 +18,8 @@ pub struct Engine {
     /// Per detector, whether its pattern holds an anchor (`has_anchor`),
     /// worked out on the first records scan.
     anchored: OnceLock<Vec<bool>>,
+    /// The detectors' keywords, built on the first scan.
+    keywords: OnceLock<Keywords>,
 }
 
 impl Engine {
@@ -23,7 +27,12 @@ impl Engine {
         Self {
             detectors,
             anchored: OnceLock::new(),
+            keywords: OnceLock::new(),
         }
+    }
+
+    fn keywords(&self) -> &Keywords {
+        self.keywords.get_or_init(|| Keywords::new(&self.detectors))
     }
 
     pub fn detectors(&self) -> &[Box<dyn Detector>] {
@@ -31,10 +40,16 @@ impl Engine {
     }
 
     /// Scan a single chunk and return hits (sequential, single-thread).
+    ///
+    /// A detector with [`Detector::keywords`] runs only when the chunk holds
+    /// one of them; one search finds every detector's keywords.
     pub fn scan_chunk(&self, chunk: &Chunk<'_>) -> Vec<Hit> {
+        let live = self.keywords().live(chunk.bytes);
         let mut hits = Vec::new();
-        for det in &self.detectors {
-            scan_with(det.as_ref(), chunk, &mut hits);
+        for (det, live) in self.detectors.iter().zip(live) {
+            if live {
+                scan_with(det.as_ref(), chunk, &mut hits);
+            }
         }
         hits
     }
@@ -59,6 +74,9 @@ impl Engine {
     /// past its record. No search reads past its window and a window holds
     /// at most 32 records, so a detector's searches read each byte at most
     /// 32 times.
+    ///
+    /// A detector with [`Detector::keywords`] skips every window that holds
+    /// none of them: a match a record holds alone lies in its window.
     pub fn scan_records(&self, bytes: &[u8]) -> Vec<Hit> {
         let records = record_spans(bytes);
         let chunk = |i: usize| {
@@ -70,16 +88,20 @@ impl Engine {
             }
         };
         let windows = record_windows(&records);
+        let live = self.keywords().live_windows(bytes, &records, &windows);
         let anchored = self.anchored.get_or_init(|| {
             self.detectors
                 .iter()
-                .map(|d| has_anchor(d.pattern()))
+                .map(|d| d.anchored().unwrap_or_else(|| has_anchor(d.pattern())))
                 .collect()
         });
         let mut hits = Vec::new();
-        for (det, &anchored) in self.detectors.iter().zip(anchored) {
+        let every: Vec<u32> = (0..windows.len() as u32).collect();
+        for ((det, &anchored), live) in self.detectors.iter().zip(anchored).zip(&live) {
             let det = det.as_ref();
-            for &(first, end) in &windows {
+            let live = live.as_deref().unwrap_or(&every);
+            for &w in live {
+                let (first, end) = windows[w as usize];
                 if anchored {
                     for i in first..end {
                         scan_with(det, &chunk(i), &mut hits);
@@ -124,6 +146,131 @@ impl Engine {
             .into_par_iter()
             .flat_map(|c| self.scan_chunk(&c))
             .collect()
+    }
+}
+
+/// Every detector's [`Detector::keywords`] in one ASCII case-insensitive
+/// search. A detector without keywords is live everywhere.
+struct Keywords {
+    /// `None` when no detector has keywords.
+    search: Option<AhoCorasick>,
+    /// Per keyword (search pattern), the detectors it lets run.
+    owners: Vec<Vec<usize>>,
+    /// Per detector, whether keywords gate it.
+    gated: Vec<bool>,
+}
+
+impl Keywords {
+    fn new(detectors: &[Box<dyn Detector>]) -> Self {
+        let mut index: HashMap<Vec<u8>, usize> = HashMap::new();
+        let mut patterns: Vec<Vec<u8>> = Vec::new();
+        let mut owners: Vec<Vec<usize>> = Vec::new();
+        let mut gated = vec![false; detectors.len()];
+        for (i, d) in detectors.iter().enumerate() {
+            // No set, an empty set or an empty keyword: run everywhere.
+            let Some(kw) = d.keywords() else { continue };
+            if kw.is_empty() || kw.iter().any(|k| k.is_empty()) {
+                continue;
+            }
+            gated[i] = true;
+            for k in kw {
+                let k = k.to_ascii_lowercase();
+                let id = *index.entry(k.clone()).or_insert_with(|| {
+                    patterns.push(k);
+                    owners.push(Vec::new());
+                    owners.len() - 1
+                });
+                owners[id].push(i);
+            }
+        }
+        let search = (!patterns.is_empty())
+            .then(|| {
+                AhoCorasick::builder()
+                    .ascii_case_insensitive(true)
+                    .match_kind(MatchKind::Standard)
+                    .build(&patterns)
+            })
+            .transpose();
+        match search {
+            Ok(search) => Self {
+                search,
+                owners,
+                gated,
+            },
+            // A search that cannot be built gates nothing.
+            Err(_) => Self {
+                search: None,
+                owners: Vec::new(),
+                gated: vec![false; detectors.len()],
+            },
+        }
+    }
+
+    /// Per detector, whether it runs on `bytes`.
+    fn live(&self, bytes: &[u8]) -> Vec<bool> {
+        let mut live: Vec<bool> = self.gated.iter().map(|g| !g).collect();
+        let Some(search) = &self.search else {
+            return live;
+        };
+        let mut seen = vec![false; self.owners.len()];
+        let mut left = self.owners.len();
+        for m in search.find_overlapping_iter(bytes) {
+            let p = m.pattern().as_usize();
+            if !seen[p] {
+                seen[p] = true;
+                for &d in &self.owners[p] {
+                    live[d] = true;
+                }
+                left -= 1;
+                if left == 0 {
+                    break;
+                }
+            }
+        }
+        live
+    }
+
+    /// Per detector, the windows it runs on, ascending: `None` for every
+    /// window. A keyword counts for a window when it lies wholly inside it.
+    fn live_windows(
+        &self,
+        bytes: &[u8],
+        records: &[(usize, usize)],
+        windows: &[(usize, usize)],
+    ) -> Vec<Option<Vec<u32>>> {
+        let mut live: Vec<Option<Vec<u32>>> =
+            self.gated.iter().map(|&g| g.then(Vec::new)).collect();
+        let Some(search) = &self.search else {
+            return live;
+        };
+        let starts: Vec<usize> = windows.iter().map(|&(f, _)| records[f].0).collect();
+        let ends: Vec<usize> = windows.iter().map(|&(_, e)| records[e - 1].1).collect();
+        // The last window each keyword was counted in.
+        let mut last = vec![u32::MAX; self.owners.len()];
+        for m in search.find_overlapping_iter(bytes) {
+            let w = starts.partition_point(|&s| s <= m.start()) - 1;
+            if m.end() > ends[w] {
+                continue;
+            }
+            let p = m.pattern().as_usize();
+            let w = w as u32;
+            if last[p] == w {
+                continue;
+            }
+            last[p] = w;
+            for &d in &self.owners[p] {
+                if let Some(l) = &mut live[d] {
+                    if l.last() != Some(&w) {
+                        l.push(w);
+                    }
+                }
+            }
+        }
+        for l in live.iter_mut().flatten() {
+            l.sort_unstable();
+            l.dedup();
+        }
+        live
     }
 }
 

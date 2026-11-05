@@ -307,6 +307,23 @@ pub trait Detector: Send + Sync {
     fn verify(&self, _candidate: &[u8]) -> VerifyResult {
         VerifyResult::Unknown
     }
+    /// Byte strings, compared ASCII case-insensitively, at least one of
+    /// which lies inside every match of [`Detector::pattern`]. The engine
+    /// skips the detector on a chunk (or a records window) that holds none
+    /// of them, so a detector that builds its pattern on first use is never
+    /// compiled for text without its keywords. `None`, the default, means no
+    /// such set is known: the detector runs on every chunk.
+    ///
+    /// A wrong set loses hits: every member must be a necessary condition.
+    fn keywords(&self) -> Option<&[&[u8]]> {
+        None
+    }
+    /// Whether [`Detector::pattern`] holds a line or text anchor, when that
+    /// is known without compiling it. `None`, the default, has the engine
+    /// read it from the compiled pattern.
+    fn anchored(&self) -> Option<bool> {
+        None
+    }
 }
 
 /// Shannon entropy of a byte slice in bits per byte (range 0.0..=8.0).

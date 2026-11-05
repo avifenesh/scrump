@@ -127,6 +127,16 @@ semantic constraints beyond regex. `post_filter_with_context` also receives
 the bytes before and after the selected match in its format chunk; its
 default implementation delegates to `post_filter`.
 
+A run compiles only the rules its input can match. At build time every
+embedded rule gets its keywords: byte strings, one of which every match
+holds, taken from the prefix or suffix literals of the parsed pattern
+(Unicode case variants included). The engine finds every rule's keywords in
+one Aho-Corasick search per chunk, or per window in `--records` mode, and
+runs and compiles a rule only where one of them occurs. A rule with no
+usable keywords (a bare character class like `\b[a-f0-9]{32}\b`) runs on
+every chunk. Rules from `--rules-path` are compiled at load, so a bad
+pattern still fails the load.
+
 The default Azure detectors exclude two complete JSON metadata shapes:
 canonical SHA-512 digests in `integrity: "sha512-…"` fields, and `store_id`
 values in Cloudflare secret bindings with nonempty `binding` and

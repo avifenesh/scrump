@@ -637,6 +637,7 @@ dependencies = [
 name = "scrump-detect"
 version = "0.2.0"
 dependencies = [
+ "aho-corasick",
  "rayon",
  "regex",
  "regex-syntax",
@@ -758,6 +759,7 @@ version = "0.2.0"
 dependencies = [
  "base64",
  "regex",
+ "regex-syntax",
  "scrump-core",
  "scrump-detect",
  "serde",

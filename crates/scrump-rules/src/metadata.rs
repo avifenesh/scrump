@@ -60,6 +60,12 @@ impl Detector for MetadataFilter {
             .post_filter_with_context(candidate, before, after)
             && !self.known_metadata(candidate, before, after)
     }
+    fn keywords(&self) -> Option<&[&[u8]]> {
+        self.inner.keywords()
+    }
+    fn anchored(&self) -> Option<bool> {
+        self.inner.anchored()
+    }
 }
 
 impl MetadataFilter {

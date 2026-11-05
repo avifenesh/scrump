@@ -6,6 +6,21 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Start-up: a run compiles only the rules its input can match. Each
+  embedded rule carries keywords worked out at build time (one of them is
+  in every match); one Aho-Corasick search per chunk, or per records
+  window, finds them, and a rule's regex is compiled and run only where one
+  occurs. A rule without usable keywords runs on every chunk, as before.
+  Empty input went from about 0.36 s to 0.01 s with the text profile, and
+  `--records` scans skip windows without a rule's keywords. Hits are
+  unchanged: `tests/keywords.rs` checks every loaded rule's keywords
+  against text generated from its pattern, and the gated engine against
+  the ungated one.
+- `Detector` has two methods with defaults, `keywords` and `anchored`.
+  Wrappers should forward them; one that does not loses only the speed-up.
+
 ## [0.2.0] - 2026-10-30
 
 ### Changed

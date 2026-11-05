@@ -30,8 +30,8 @@ There are three concerns and three crates that own them:
 | Concern | Crate | What it owns |
 |---|---|---|
 | What a "redactable region" looks like | `scrump-core` | `Format`, `Chunk`, `Hit`, `Replacement`, `Dispatcher`, `apply_hits_in_place`, `write_atomic` |
-| Whether a byte range *is* a secret | `scrump-detect` | Regex compilation, entropy floor, post-filter slot, parallel scan |
-| Which patterns to look for | `scrump-rules` | Curated rules + auto-extracted TruffleHog mirror + hand-coded post-filters |
+| Whether a byte range *is* a secret | `scrump-detect` | Keyword prefilter, entropy floor, post-filter slot, parallel scan |
+| Which patterns to look for | `scrump-rules` | Curated rules + auto-extracted TruffleHog mirror + hand-coded post-filters; `build.rs` turns the rule files into tables with each rule's keywords, and a rule's regex is compiled on first use |
 
 Per-format details live in the `scrump-format-*` crates. Adding a new
 format means writing one crate; the engine and dispatcher don't change.
