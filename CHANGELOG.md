@@ -6,6 +6,8 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-05
+
 ### Changed
 
 - Start-up: a run compiles only the rules its input can match. Each
@@ -20,6 +22,7 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   the ungated one.
 - `Detector` has two methods with defaults, `keywords` and `anchored`.
   Wrappers should forward them; one that does not loses only the speed-up.
+- rusqlite 0.41 and zip 9.1 (#51, #52).
 
 ## [0.2.0] - 2026-10-30
 
@@ -463,7 +466,8 @@ plus two third-party-compat test corpora.
 This is a fresh repo — no CVEs against earlier versions to backport.
 For the disclosure policy, see [`SECURITY.md`](SECURITY.md).
 
-[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/avifenesh/scrump/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/avifenesh/scrump/releases/tag/v0.2.1
 [0.2.0]: https://github.com/avifenesh/scrump/releases/tag/v0.2.0
 [0.1.8]: https://github.com/avifenesh/scrump/releases/tag/v0.1.8
 [0.1.7]: https://github.com/avifenesh/scrump/releases/tag/v0.1.7
