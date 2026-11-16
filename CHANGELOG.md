@@ -6,6 +6,21 @@ follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- TruffleHog compat: upstream corpus drift (November 2026) added the
+  `serval` detector, whose `svl_secret_(pk|wk|mk)_` secret carries a
+  CRC32 checksum TruffleHog verifies after the regex match. The port's
+  auto-extracted rule cannot express that check, so the detector's own
+  negative cases (checksum mismatch, checksum valid for another key
+  type) tripped it, putting the harness two failures over its floor.
+  `serval__secretpat` joins `TH_QUARANTINE` and `trufflehog.yaml` is
+  re-extracted; the harness is back at its 99-failure floor. The same
+  refresh added `sonarqube__hosturlpat`, which captures the server
+  address out of `sonar.host.url=...` config lines — a URL, not a
+  credential — so it is quarantined too (`sonarqube__keypat` stays
+  active). `fn_marquee` gains a regression for both.
+
 ## [0.2.1] - 2026-11-05
 
 ### Changed

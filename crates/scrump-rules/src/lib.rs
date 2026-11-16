@@ -202,6 +202,7 @@ pub const TH_QUARANTINE: &[&str] = &[
     "salesforceoauth2__consumersecretpat", // keyword `secret|consumer` + 19-64 alnums
     "salesforcerefreshtoken__consumersecretpat", // same shape as above
     "saucelabs__usernamepat", // keyword `username` + 2-70 alnums — too loose
+    "serval__secretpat", // `svl_secret_(pk|wk|mk)_` base62 shape — upstream CRC32 checksums the tail; the negative cases (checksum mismatch, checksum valid for another key type) all match the bare regex
     "shopifyoauth__clientidpat", // keyword `id` + 32 alnums — duplicate hits of spotify/box
     "signable__keywordpat", // `(?i)([a-z]{2})signable` matches `assignable`, captures only 2 chars
     "signable__tokenpat", // `.{0,2}signable` matches `assignable` followed by 32 alnums
@@ -209,7 +210,8 @@ pub const TH_QUARANTINE: &[&str] = &[
     "sirv__keypat", // keyword `sirv` + 88 chars — matches binary garbage in model files
     "sourcegraph__keypat", // third alternative `[a-fA-F0-9]{40}` matches every SHA-1
     "smartsheets__keypat", // keyword `sheet` matches `worksheet`/`spreadsheet` + 26-37 alnums — Go type names
-    "sumologickey__keypat", // keyword `sumo|accessKey` + 64 alnums — `accessKey` too generic
+    "sonarqube__hosturlpat", // captures `sonar.host.url=http://localhost:9000` — a server URL, not a credential
+    "sumologickey__keypat",  // keyword `sumo|accessKey` + 64 alnums — `accessKey` too generic
     // keyword `(?i:survey)` — the ENGLISH WORD, not the vendor name — plus
     // `\b([a-z0-9A-Z-]{36})\b`. The hyphen in the class is what makes it hopeless: any 36-char
     // hyphenated slug within 40 chars of the word "survey" matches, and prose about surveys is
@@ -375,6 +377,10 @@ const STRUCTURAL_ALLOWLIST: &[&str] = &[
     "okta__oauthclientsecretpat",
     "harvest__keypat",
     "surveyanyplace__keypat",
+    // sonarqube__keypat carries a literal `sq[apu]_` prefix, so it is not a
+    // bare charclass in spirit; the 2026-11 host-URL quarantine must not
+    // sweep the credential rule with it.
+    "sonarqube__keypat",
 ];
 
 /// Returns `true` when a rule id is part of the active ruleset — i.e. it is

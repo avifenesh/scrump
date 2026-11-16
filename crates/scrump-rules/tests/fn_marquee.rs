@@ -449,3 +449,58 @@ fn corpus_2026_10_gitlab_entropy_and_okta_domain() {
         );
     }
 }
+
+#[test]
+fn corpus_2026_11_serval_checksum_and_sonar_host_url() {
+    // Upstream drift round 2026-11: trufflehog added a `serval` detector
+    // whose svl_secret_(pk|wk|mk)_ secret ends in a CRC32 checksum the Go
+    // detector verifies after the match, and a `sonarqube` host-URL rule
+    // that captures the server address out of sonar.*.url config lines.
+    // The checksum cannot be expressed in a rule, so serval__secretpat is
+    // quarantined whole (its negative cases — checksum mismatch, checksum
+    // valid for another key type — all match the bare regex); the host URL
+    // is not a credential at all and joins the hostname-quarantine policy.
+    let engine = Engine::new(default_detectors().expect("default rules"));
+    let scan = |s: &str| -> Vec<String> {
+        engine
+            .scan_chunk(&Chunk {
+                bytes: s.as_bytes(),
+                offset: 0,
+                origin: ChunkOrigin::Raw,
+            })
+            .into_iter()
+            .map(|h| h.rule_id)
+            .collect()
+    };
+
+    // The SonarQube host URL from upstream's own test corpus must not be
+    // redacted — there is no credential in the line.
+    let cfg = "sonar.host.url=http://localhost:9000\n";
+    assert!(
+        scan(cfg).iter().all(|r| !r.starts_with("sonarqube__")),
+        "an ordinary server URL in sonar.host.url is not a secret: {:?}",
+        scan(cfg)
+    );
+
+    // The shaped sqp_/sqa_/squ_ token must still be detected — the host
+    // quarantine must not eat the paired credential rule.
+    let key = format!("sqp_{}", hexfill(5, 40));
+    assert!(
+        scan(&format!("sonar.token={key}\n")).contains(&"sonarqube__keypat".to_string()),
+        "FALSE NEGATIVE — a SonarQube token is no longer detected"
+    );
+
+    // Both serval shapes — a well-formed-looking secret whose checksum is
+    // wrong, and one whose checksum belongs to another key type — are
+    // negative cases upstream; with the rule quarantined nothing may fire
+    // on them (the checksum makes a curated replacement unexpressible).
+    for tag in ["pk", "wk", "mk"] {
+        let bogus = format!("svl_secret_{tag}_{}aaaaaa", fill(3, 43));
+        assert!(
+            scan(&format!("token {bogus}\n"))
+                .iter()
+                .all(|r| !r.starts_with("serval__")),
+            "quarantined serval rule fired on the checksum-less shape: {bogus}"
+        );
+    }
+}

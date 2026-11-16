@@ -468,9 +468,6 @@ rules:
 - id: boxoauth__clientsecretpat
   pattern: (?i:secret)(?:.|[\n\r]){0,40}?\b([a-zA-Z0-9]{32})\b
   capture_index: 1
-- id: boxoauth__subjectidpat
-  pattern: (?i:enterprise|enterprise_id|user|user_id|subject|box_subject)(?:.|[\n\r]){0,40}?\b([0-9]{6,20})\b
-  capture_index: 1
 - id: braintreepayments__keypat
   pattern: (?i:braintree)(?:.|[\n\r]){0,40}?\b([0-9a-f]{32})\b
   capture_index: 1
@@ -1191,6 +1188,9 @@ rules:
 - id: finnhub__keypat
   pattern: (?i:finnhub)(?:.|[\n\r]){0,40}?\b([0-9a-z]{20})\b
   capture_index: 1
+- id: fireworks__keypat
+  pattern: \b(fw_[a-zA-Z0-9]{20,40})\b
+  capture_index: 1
 - id: fixerio__keypat
   pattern: (?i:fixer)(?:.|[\n\r]){0,40}?\b([A-Za-z0-9]{32})\b
   capture_index: 1
@@ -1574,6 +1574,9 @@ rules:
 - id: impala__keypat
   pattern: (?i:impala)(?:.|[\n\r]){0,40}?\b([0-9A-Za-z_]{46})\b
   capture_index: 1
+- id: infisical__keypat
+  pattern: \b((st\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[0-9a-f]{32})(?:\.[0-9a-f]{32})?)\b
+  capture_index: 1
 - id: infura__keypat
   pattern: (?i:infura)(?:.|[\n\r]){0,40}?\b([0-9a-z]{32})\b
   capture_index: 1
@@ -1723,6 +1726,9 @@ rules:
   capture_index: 1
 - id: kylas__keypat
   pattern: (?i:kylas)(?:.|[\n\r]){0,40}?\b([a-z0-9-]{36})\b
+  capture_index: 1
+- id: lambdacloud__keypat
+  pattern: \b(secret_[a-z0-9][a-z0-9-]{0,63}_[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}\.[A-Za-z0-9]{32})(?:[^A-Za-z0-9]|$)
   capture_index: 1
 - id: langfuse__publickey
   pattern: (?i:langfuse)(?:.|[\n\r]){0,40}?\b(pk-lf-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b
@@ -2744,6 +2750,12 @@ rules:
 - id: serpstack__keypat
   pattern: (?i:serpstack)(?:.|[\n\r]){0,40}?\b([a-z0-9]{32})\b
   capture_index: 1
+- id: serval__secretpat
+  pattern: \b(svl_secret_(pk|wk|mk)_([0-9A-Za-z]{43})([0-9A-Za-z]{6}))\b
+  capture_index: 1
+- id: serval__idpat
+  pattern: (?i:serval|client)(?:.|[\n\r]){0,40}?\b([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\b
+  capture_index: 1
 - id: sheety__keypat
   pattern: (?i:sheety)(?:.|[\n\r]){0,40}?\b([0-9a-z]{64})\b
   capture_index: 1
@@ -2883,6 +2895,12 @@ rules:
   capture_index: 1
 - id: sonarcloud_v2__keypat
   pattern: \b(sqco_[[:alnum:]]{59})\b
+  capture_index: 1
+- id: sonarqube__keypat
+  pattern: \b(sq[apu]_[0-9a-f]{40})\b
+  capture_index: 1
+- id: sonarqube__hosturlpat
+  pattern: (?i)\bsonar[._](?:host[._]url|host|url)\b["'\s:=,>]*((?:https?://)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?)
   capture_index: 1
 - id: sourcegraph__keypat
   pattern: \b(sgp_(?:[a-fA-F0-9]{16}|local)_[a-fA-F0-9]{40}|sgp_[a-fA-F0-9]{40}|[a-fA-F0-9]{40})\b
